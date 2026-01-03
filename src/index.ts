@@ -1,0 +1,36 @@
+import express from "express";
+import dotenv from "dotenv";
+import cors from "cors";
+import checkinRoutes from "./routes/checkin";
+import gachaRoutes from "./routes/gacha";
+import assemblyRoutes from "./routes/assembly";
+import garageRoutes from "./routes/garage";
+import metadataRoutes from "./routes/metadata";
+
+dotenv.config();
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+// Middleware
+app.use(cors());
+app.use(express.json());
+
+// Health check
+app.get("/health", (_, res: express.Response) => {
+  res.json({ status: "ok" });
+});
+
+// API Routes
+app.use("/api", checkinRoutes);
+app.use("/api", gachaRoutes);
+app.use("/api", assemblyRoutes);
+app.use("/api", garageRoutes);
+
+// Metadata Routes (for NFT marketplaces)
+app.use(metadataRoutes);
+
+// Start server
+app.listen(PORT, () => {
+  console.log(`Backend running on port ${PORT}`);
+});
