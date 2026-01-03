@@ -1,0 +1,36 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id            String     @id
+  walletAddress String     @unique
+  coins         Int        @default(0)
+  lastCheckIn   DateTime   @default(now())
+  createdAt     DateTime   @default(now())
+  fragments     Fragment[]
+  cars          Car[]
+}
+
+model Fragment {
+  id        Int      @id @default(autoincrement())
+  userId    String
+  typeId    Int
+  txHash    String?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+model Car {
+  tokenId     Int      @id
+  ownerId     String
+  modelName   String?
+  series      String?
+  isRedeemed  Boolean  @default(false)
+  mintTxHash  String?
+  user        User     @relation(fields: [ownerId], references: [id])
+}
