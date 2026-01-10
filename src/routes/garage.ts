@@ -1,4 +1,4 @@
-import { Router, Response } from "express";
+import { Router, Request, Response } from "express";
 import { prisma } from "../lib/prisma";
 import { auth, AuthRequest } from "../middleware/auth";
 
@@ -8,9 +8,9 @@ const router = Router();
  * GET /garage/overview
  * Get complete overview of user's garage (cars + fragments)
  */
-router.get("/garage/overview", auth, async (req: AuthRequest, res: Response) => {
+router.get("/garage/overview", auth, async (req: Request, res: Response) => {
   try {
-    const { userId } = req;
+    const { userId } = req as AuthRequest;
 
     // Get user with all related data
     const user = await prisma.user.findUnique({
@@ -107,9 +107,9 @@ router.get("/garage/overview", auth, async (req: AuthRequest, res: Response) => 
  * GET /garage/cars
  * Get all cars owned by user with pagination
  */
-router.get("/garage/cars", auth, async (req: AuthRequest, res: Response) => {
+router.get("/garage/cars", auth, async (req: Request, res: Response) => {
   try {
-    const { userId } = req;
+    const { userId } = req as AuthRequest;
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 20;
     const skip = (page - 1) * limit;
@@ -173,9 +173,9 @@ router.get("/garage/cars", auth, async (req: AuthRequest, res: Response) => {
  * GET /garage/fragments
  * Get fragment inventory with counts by type
  */
-router.get("/garage/fragments", auth, async (req: AuthRequest, res: Response) => {
+router.get("/garage/fragments", auth, async (req: Request, res: Response) => {
   try {
-    const { userId } = req;
+    const { userId } = req as AuthRequest;
 
     // Get all fragments
     const fragments = await prisma.fragment.findMany({
@@ -188,7 +188,7 @@ router.get("/garage/fragments", auth, async (req: AuthRequest, res: Response) =>
       if (!acc[fragment.typeId]) {
         acc[fragment.typeId] = [];
       }
-      acc[fragment.typeId].push({
+      acc[fragment.typeId]!.push({
         id: fragment.id,
         txHash: fragment.txHash,
         createdAt: fragment.createdAt,
@@ -250,10 +250,10 @@ router.get("/garage/fragments", auth, async (req: AuthRequest, res: Response) =>
  * GET /garage/car/:tokenId
  * Get detailed information about a specific car
  */
-router.get("/garage/car/:tokenId", auth, async (req: AuthRequest, res: Response) => {
+router.get("/garage/car/:tokenId", auth, async (req: Request, res: Response) => {
   try {
-    const { userId } = req;
-    const tokenId = parseInt(req.params.tokenId);
+    const { userId } = req as AuthRequest;
+    const tokenId = parseInt(req.params.tokenId!);
 
     if (isNaN(tokenId)) {
       res.status(400).json({ error: "Invalid token ID" });

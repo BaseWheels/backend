@@ -67,7 +67,7 @@ export function selectRandomReward(rewards: GachaReward[]): GachaReward {
   }
 
   // Fallback to first reward (should never happen)
-  return rewards[0];
+  return rewards[0]!; // Non-null assertion since we know rewards array is not empty
 }
 
 /**

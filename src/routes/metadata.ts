@@ -9,7 +9,7 @@ const router = Router();
  */
 router.get("/metadata/cars/:tokenId", async (req: Request, res: Response) => {
   try {
-    const tokenId = parseInt(req.params.tokenId);
+    const tokenId = parseInt(req.params.tokenId!);
 
     if (isNaN(tokenId)) {
       res.status(400).json({ error: "Invalid token ID" });
@@ -77,7 +77,7 @@ router.get("/metadata/cars/:tokenId", async (req: Request, res: Response) => {
  */
 router.get("/metadata/fragments/:tokenId", async (req: Request, res: Response) => {
   try {
-    const tokenId = parseInt(req.params.tokenId);
+    const tokenId = parseInt(req.params.tokenId!);
 
     if (isNaN(tokenId) || tokenId < 0 || tokenId > 4) {
       res.status(400).json({ error: "Invalid fragment type (must be 0-4)" });

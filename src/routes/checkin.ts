@@ -1,4 +1,4 @@
-import { Router, Response } from "express";
+import { Router, Request, Response } from "express";
 import { prisma } from "../lib/prisma";
 import { auth, AuthRequest } from "../middleware/auth";
 import { mintFragment } from "../blockchain/client";
@@ -9,9 +9,9 @@ const router = Router();
  * POST /check-in
  * Daily check-in endpoint with fragment minting
  */
-router.post("/check-in", auth, async (req: AuthRequest, res: Response) => {
+router.post("/check-in", auth, async (req: Request, res: Response) => {
   try {
-    const { userId, walletAddress } = req;
+    const { userId, walletAddress } = req as AuthRequest;
 
     // 1. Find or create user
     let user = await prisma.user.findUnique({

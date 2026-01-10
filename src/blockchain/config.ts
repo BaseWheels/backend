@@ -24,7 +24,7 @@ export const FRAGMENT_CONTRACT_ABI = [
         "type": "uint256"
       }
     ],
-    "name": "mint",
+    "name": "mintFragment",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -33,16 +33,16 @@ export const FRAGMENT_CONTRACT_ABI = [
     "inputs": [
       {
         "internalType": "address",
-        "name": "account",
+        "name": "user",
         "type": "address"
       }
     ],
     "name": "checkAllParts",
     "outputs": [
       {
-        "internalType": "bool",
+        "internalType": "uint256[]",
         "name": "",
-        "type": "bool"
+        "type": "uint256[]"
       }
     ],
     "stateMutability": "view",
@@ -52,8 +52,18 @@ export const FRAGMENT_CONTRACT_ABI = [
     "inputs": [
       {
         "internalType": "address",
-        "name": "from",
+        "name": "user",
         "type": "address"
+      },
+      {
+        "internalType": "uint256[]",
+        "name": "ids",
+        "type": "uint256[]"
+      },
+      {
+        "internalType": "uint256[]",
+        "name": "amounts",
+        "type": "uint256[]"
       }
     ],
     "name": "burnForAssembly",
@@ -73,26 +83,36 @@ export const CAR_CONTRACT_ABI = [
         "internalType": "address",
         "name": "to",
         "type": "address"
-      },
-      {
-        "internalType": "uint256",
-        "name": "tokenId",
-        "type": "uint256"
-      },
-      {
-        "internalType": "string",
-        "name": "modelName",
-        "type": "string"
-      },
-      {
-        "internalType": "string",
-        "name": "series",
-        "type": "string"
       }
     ],
     "name": "mintCar",
-    "outputs": [],
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
     "stateMutability": "nonpayable",
     "type": "function"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "to",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "tokenId",
+        "type": "uint256"
+      }
+    ],
+    "name": "CarMinted",
+    "type": "event"
   }
 ] as const;

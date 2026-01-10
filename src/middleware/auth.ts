@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { PrivyClient } from "@privy-io/server-auth";
+import { prisma } from "../lib/prisma";
 
 const privyAppId = process.env.PRIVY_APP_ID;
 const privyAppSecret = process.env.PRIVY_APP_SECRET;
@@ -36,6 +37,19 @@ export async function auth(
       res.status(400).json({ error: "User has no linked wallet" });
       return;
     }
+
+    // Auto-create user in database if doesn't exist (just-in-time provisioning)
+    await prisma.user.upsert({
+      where: { id: claims.userId },
+      update: {
+        walletAddress: walletAddress.toLowerCase(),
+      },
+      create: {
+        id: claims.userId,
+        walletAddress: walletAddress.toLowerCase(),
+        coins: 0, // Starting coins
+      },
+    });
 
     (req as AuthRequest).userId = claims.userId;
     (req as AuthRequest).walletAddress = walletAddress.toLowerCase();

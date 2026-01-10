@@ -1,8 +1,8 @@
-import { Router, Response } from "express";
+import { Router, Request, Response } from "express";
 import { prisma } from "../lib/prisma";
 import { auth, AuthRequest } from "../middleware/auth";
 import { mintCar } from "../blockchain/client";
-import { GACHA_BOXES, selectRandomReward, generateTokenId } from "../config/gacha";
+import { GACHA_BOXES, selectRandomReward } from "../config/gacha";
 
 const router = Router();
 
@@ -10,9 +10,9 @@ const router = Router();
  * POST /gacha/open
  * Open a gacha box and mint a random Car NFT
  */
-router.post("/gacha/open", auth, async (req: AuthRequest, res: Response) => {
+router.post("/gacha/open", auth, async (req: Request, res: Response) => {
   try {
-    const { userId, walletAddress } = req;
+    const { userId, walletAddress } = req as AuthRequest;
     const { boxType } = req.body;
 
     // 1. Validate box type
@@ -49,17 +49,14 @@ router.post("/gacha/open", auth, async (req: AuthRequest, res: Response) => {
 
     // 4. Randomly select a reward
     const reward = selectRandomReward(gachaBox.rewards);
-    const tokenId = generateTokenId();
 
-    // 5. Mint Car NFT on-chain
+    // 5. Mint Car NFT on-chain (contract auto-generates tokenId)
+    let tokenId: number;
     let txHash: string;
     try {
-      txHash = await mintCar(
-        walletAddress,
-        tokenId,
-        reward.modelName,
-        reward.series
-      );
+      const result = await mintCar(walletAddress);
+      tokenId = result.tokenId;
+      txHash = result.txHash;
     } catch (error) {
       console.error("Blockchain mint failed:", error);
       res.status(500).json({
@@ -119,9 +116,9 @@ router.post("/gacha/open", auth, async (req: AuthRequest, res: Response) => {
  * GET /gacha/boxes
  * Get available gacha box types and their costs
  */
-router.get("/gacha/boxes", auth, async (req: AuthRequest, res: Response) => {
+router.get("/gacha/boxes", auth, async (req: Request, res: Response) => {
   try {
-    const { userId } = req;
+    const { userId } = req as AuthRequest;
 
     // Get user coins
     const user = await prisma.user.findUnique({

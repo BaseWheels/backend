@@ -1,8 +1,8 @@
-import { Router, Response } from "express";
+import { Router, Request, Response } from "express";
 import { prisma } from "../lib/prisma";
 import { auth, AuthRequest } from "../middleware/auth";
 import { checkAllParts, burnForAssembly, mintCar } from "../blockchain/client";
-import { selectRandomAssembledCar, generateAssemblyTokenId } from "../config/assembly";
+import { selectRandomAssembledCar } from "../config/assembly";
 
 const router = Router();
 
@@ -10,9 +10,9 @@ const router = Router();
  * POST /assembly/forge
  * Assemble 5 fragments into a complete Car NFT
  */
-router.post("/assembly/forge", auth, async (req: AuthRequest, res: Response) => {
+router.post("/assembly/forge", auth, async (req: Request, res: Response) => {
   try {
-    const { userId, walletAddress } = req;
+    const { userId, walletAddress } = req as AuthRequest;
 
     // 1. Verify user exists
     const user = await prisma.user.findUnique({
@@ -60,23 +60,20 @@ router.post("/assembly/forge", auth, async (req: AuthRequest, res: Response) => 
 
     // 4. Select random assembled car
     const assembledCar = selectRandomAssembledCar();
-    const tokenId = generateAssemblyTokenId();
 
-    // 5. Mint assembled Car NFT
+    // 5. Mint assembled Car NFT (contract auto-generates tokenId)
     console.log(`Minting car ${assembledCar.modelName} for user ${walletAddress}...`);
+    let tokenId: number;
     let mintTxHash: string;
     try {
-      mintTxHash = await mintCar(
-        walletAddress,
-        tokenId,
-        assembledCar.modelName,
-        assembledCar.series
-      );
+      const result = await mintCar(walletAddress);
+      tokenId = result.tokenId;
+      mintTxHash = result.txHash;
     } catch (error) {
       console.error("Failed to mint car:", error);
       // CRITICAL: Fragments already burned! Log this for manual recovery
       console.error(`CRITICAL: User ${walletAddress} burned fragments but mint failed!`);
-      console.error(`Burn TX: ${burnTxHash}, TokenId: ${tokenId}`);
+      console.error(`Burn TX: ${burnTxHash}`);
 
       res.status(500).json({
         error: "Failed to mint assembled car on blockchain",
@@ -123,9 +120,9 @@ router.post("/assembly/forge", auth, async (req: AuthRequest, res: Response) => 
  * GET /assembly/can-forge
  * Check if user can forge (has all fragments)
  */
-router.get("/assembly/can-forge", auth, async (req: AuthRequest, res: Response) => {
+router.get("/assembly/can-forge", auth, async (req: Request, res: Response) => {
   try {
-    const { walletAddress } = req;
+    const { walletAddress } = req as AuthRequest;
 
     // Check on-chain
     const hasAllParts = await checkAllParts(walletAddress);

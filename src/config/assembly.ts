@@ -46,7 +46,7 @@ export function selectRandomAssembledCar(): AssembledCar {
   }
 
   // Fallback to first car (should never happen)
-  return ASSEMBLED_CARS[0];
+  return ASSEMBLED_CARS[0]!; // Non-null assertion since we know ASSEMBLED_CARS array is not empty
 }
 
 /**
