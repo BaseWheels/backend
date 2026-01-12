@@ -4,11 +4,13 @@
  */
 
 const { ethers } = require("ethers");
+require("dotenv").config();
 
-// Configuration
-const RPC_URL = "https://sepolia.base.org";
-const CAR_CONTRACT_ADDRESS = "0xb744cec7EfA685301Cc24EAFfdC2a0B4975e5B30";
-const FRAGMENT_CONTRACT_ADDRESS = "0x832eBb3063499843070FA2C41a35c195fa38162D";
+// Configuration from .env
+const RPC_URL = process.env.RPC_URL || "https://sepolia.base.org";
+const MOCKIDRX_CONTRACT_ADDRESS = process.env.MOCKIDRX_CONTRACT_ADDRESS || "0x4bEe5C6495fdba24f708c749B46F099B38c9D998";
+const CAR_CONTRACT_ADDRESS = process.env.CAR_CONTRACT_ADDRESS || "0x7AEE1BFE9fD152eA1f99818cB02E1bc64DBE8b7C";
+const FRAGMENT_CONTRACT_ADDRESS = process.env.FRAGMENT_CONTRACT_ADDRESS || "0xf477FEcF885956eeCe8E84a1507D7b5Ef3Fae589";
 
 // MINTER_ROLE hash (keccak256("MINTER_ROLE"))
 const MINTER_ROLE = "0x9f2df0fed2c77648de5860a4cc508cd0818c85b8b8a1ab4ceeef8d981c8956a6";
@@ -63,6 +65,12 @@ async function grantMinterRole() {
     console.log("\n📝 Granting MINTER_ROLE...");
     console.log(`   Backend wallet: ${BACKEND_WALLET_ADDRESS}`);
 
+    // Skip MockIDRX - uses Ownable, not AccessControl
+    console.log("\n⏭️  MockIDRX Contract (ERC20):");
+    console.log("   ⚠️  MockIDRX uses Ownable, not AccessControl");
+    console.log("   → Backend must be owner (use transfer-ownership.js)");
+    console.log("   → Skipping MINTER_ROLE grant for MockIDRX");
+
     // Grant role for Car Contract
     console.log("\n1️⃣ Car Contract (ERC721)...");
     const carContract = new ethers.Contract(CAR_CONTRACT_ADDRESS, ABI, ownerWallet);
@@ -80,7 +88,7 @@ async function grantMinterRole() {
     }
 
     // Grant role for Fragment Contract
-    console.log("\n2️⃣ Fragment Contract (ERC1155)...");
+    console.log("\n3️⃣ Fragment Contract (ERC1155)...");
     const fragmentContract = new ethers.Contract(FRAGMENT_CONTRACT_ADDRESS, ABI, ownerWallet);
 
     const hasFragmentRole = await fragmentContract.hasRole(MINTER_ROLE, BACKEND_WALLET_ADDRESS);

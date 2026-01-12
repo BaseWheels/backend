@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import { prisma } from "../lib/prisma";
 import { auth, AuthRequest } from "../middleware/auth";
+import { getMockIDRXBalance } from "../blockchain/client";
 
 const router = Router();
 
@@ -10,7 +11,7 @@ const router = Router();
  */
 router.get("/garage/overview", auth, async (req: Request, res: Response) => {
   try {
-    const { userId } = req as AuthRequest;
+    const { userId, walletAddress } = req as AuthRequest;
 
     // Get user with all related data
     const user = await prisma.user.findUnique({
@@ -28,6 +29,15 @@ router.get("/garage/overview", auth, async (req: Request, res: Response) => {
     if (!user) {
       res.status(404).json({ error: "User not found" });
       return;
+    }
+
+    // Get MockIDRX balance from blockchain
+    let mockIDRXBalance: number;
+    try {
+      mockIDRXBalance = await getMockIDRXBalance(walletAddress);
+    } catch (error) {
+      console.error("Failed to get MockIDRX balance:", error);
+      mockIDRXBalance = 0; // Fallback to 0 if blockchain call fails
     }
 
     // Aggregate fragment counts by type
@@ -64,7 +74,7 @@ router.get("/garage/overview", auth, async (req: Request, res: Response) => {
       user: {
         id: user.id,
         walletAddress: user.walletAddress,
-        coins: user.coins,
+        mockIDRX: mockIDRXBalance,
         lastCheckIn: user.lastCheckIn,
         createdAt: user.createdAt,
       },

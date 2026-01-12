@@ -1,7 +1,7 @@
 import { Router, Request, Response } from "express";
 import { prisma } from "../lib/prisma";
 import { auth, AuthRequest } from "../middleware/auth";
-import { mintCar } from "../blockchain/client";
+import { mintCar, getMockIDRXBalance, verifyBurnTransaction } from "../blockchain/client";
 import { GACHA_BOXES, selectRandomReward } from "../config/gacha";
 
 const router = Router();
@@ -13,7 +13,7 @@ const router = Router();
 router.post("/gacha/open", auth, async (req: Request, res: Response) => {
   try {
     const { userId, walletAddress } = req as AuthRequest;
-    const { boxType } = req.body;
+    const { boxType, burnTxHash } = req.body;
 
     // 1. Validate box type
     if (!boxType || !GACHA_BOXES[boxType]) {
@@ -24,33 +24,42 @@ router.post("/gacha/open", auth, async (req: Request, res: Response) => {
       return;
     }
 
-    const gachaBox = GACHA_BOXES[boxType];
-
-    // 2. Get user
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-    });
-
-    if (!user) {
-      res.status(404).json({ error: "User not found" });
-      return;
-    }
-
-    // 3. Check if user has enough coins
-    if (user.coins < gachaBox.costCoins) {
+    // 2. Validate burn transaction hash
+    if (!burnTxHash || typeof burnTxHash !== "string") {
       res.status(400).json({
-        error: "Insufficient coins",
-        required: gachaBox.costCoins,
-        current: user.coins,
-        needed: gachaBox.costCoins - user.coins,
+        error: "Burn transaction hash is required",
       });
       return;
     }
 
-    // 4. Randomly select a reward
+    const gachaBox = GACHA_BOXES[boxType];
+
+    // 3. Verify burn transaction on-chain
+    try {
+      const isValid = await verifyBurnTransaction(
+        burnTxHash,
+        walletAddress,
+        gachaBox.costCoins
+      );
+
+      if (!isValid) {
+        res.status(400).json({
+          error: "Invalid burn transaction",
+        });
+        return;
+      }
+    } catch (error) {
+      console.error("Failed to verify burn transaction:", error);
+      res.status(400).json({
+        error: error instanceof Error ? error.message : "Failed to verify burn transaction",
+      });
+      return;
+    }
+
+    // 5. Randomly select a reward
     const reward = selectRandomReward(gachaBox.rewards);
 
-    // 5. Mint Car NFT on-chain (contract auto-generates tokenId)
+    // 6. Mint Car NFT on-chain (contract auto-generates tokenId)
     let tokenId: number;
     let txHash: string;
     try {
@@ -59,35 +68,32 @@ router.post("/gacha/open", auth, async (req: Request, res: Response) => {
       txHash = result.txHash;
     } catch (error) {
       console.error("Blockchain mint failed:", error);
+      // CRITICAL: MockIDRX already burned! Log this for manual recovery
+      console.error(`CRITICAL: User ${walletAddress} burned ${gachaBox.costCoins} IDRX but mint failed!`);
+      console.error(`Burn TX: ${burnTxHash}`);
       res.status(500).json({
         error: "Failed to mint Car NFT on blockchain",
+        burnTxHash,
+        message: "MockIDRX was burned but car minting failed. Contact support.",
       });
       return;
     }
 
-    // 6. Store car and deduct coins in a transaction
-    const updatedUser = await prisma.$transaction(async (tx) => {
-      // Create car record
-      await tx.car.create({
-        data: {
-          tokenId,
-          ownerId: userId,
-          modelName: reward.modelName,
-          series: reward.series,
-          mintTxHash: txHash,
-        },
-      });
-
-      // Deduct coins
-      return await tx.user.update({
-        where: { id: userId },
-        data: {
-          coins: { decrement: gachaBox.costCoins },
-        },
-      });
+    // 7. Store car record in database
+    await prisma.car.create({
+      data: {
+        tokenId,
+        ownerId: userId,
+        modelName: reward.modelName,
+        series: reward.series,
+        mintTxHash: txHash,
+      },
     });
 
-    // 7. Return success response
+    // 8. Get updated MockIDRX balance
+    const updatedBalance = await getMockIDRXBalance(walletAddress);
+
+    // 9. Return success response
     res.status(200).json({
       success: true,
       boxType,
@@ -98,9 +104,10 @@ router.post("/gacha/open", auth, async (req: Request, res: Response) => {
         rarity: reward.rarity,
         txHash,
       },
-      coins: {
+      mockIDRX: {
         spent: gachaBox.costCoins,
-        remaining: updatedUser.coins,
+        remaining: updatedBalance,
+        burnTxHash,
       },
       message: `Congratulations! You got a ${reward.rarity} ${reward.modelName}!`,
     });
@@ -118,18 +125,24 @@ router.post("/gacha/open", auth, async (req: Request, res: Response) => {
  */
 router.get("/gacha/boxes", auth, async (req: Request, res: Response) => {
   try {
-    const { userId } = req as AuthRequest;
+    const { walletAddress } = req as AuthRequest;
 
-    // Get user coins
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { coins: true },
-    });
+    // Get user MockIDRX balance from blockchain
+    let mockIDRXBalance: number;
+    try {
+      mockIDRXBalance = await getMockIDRXBalance(walletAddress);
+    } catch (error) {
+      console.error("Failed to get MockIDRX balance:", error);
+      res.status(500).json({
+        error: "Failed to get MockIDRX balance from blockchain",
+      });
+      return;
+    }
 
     const boxes = Object.entries(GACHA_BOXES).map(([key, box]) => ({
       type: key,
       costCoins: box.costCoins,
-      canAfford: user ? user.coins >= box.costCoins : false,
+      canAfford: mockIDRXBalance >= box.costCoins,
       rewards: box.rewards.map((r) => ({
         rarity: r.rarity,
         modelName: r.modelName,
@@ -139,7 +152,7 @@ router.get("/gacha/boxes", auth, async (req: Request, res: Response) => {
     }));
 
     res.status(200).json({
-      userCoins: user?.coins || 0,
+      userMockIDRX: mockIDRXBalance,
       boxes,
     });
   } catch (error) {

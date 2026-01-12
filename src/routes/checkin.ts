@@ -1,7 +1,7 @@
 import { Router, Request, Response } from "express";
 import { prisma } from "../lib/prisma";
 import { auth, AuthRequest } from "../middleware/auth";
-import { mintFragment } from "../blockchain/client";
+import { mintFragment, mintMockIDRX, getMockIDRXBalance } from "../blockchain/client";
 
 const router = Router();
 
@@ -46,53 +46,69 @@ router.post("/check-in", auth, async (req: Request, res: Response) => {
 
     // 3. Randomly select rewards
     const fragmentType = Math.floor(Math.random() * 5); // Fragment type: 0-4
-    const coinsReward = Math.floor(Math.random() * 41) + 10; // Coins: 10-50
+    const mockIDRXReward = Math.floor(Math.random() * 41) + 10; // MockIDRX: 10-50
 
     // 4. Mint fragment on-chain
-    let txHash: string;
+    let fragmentTxHash: string;
     try {
-      txHash = await mintFragment(walletAddress, fragmentType, 1);
+      fragmentTxHash = await mintFragment(walletAddress, fragmentType, 1);
     } catch (error) {
-      console.error("Blockchain mint failed:", error);
+      console.error("Blockchain fragment mint failed:", error);
       res.status(500).json({
         error: "Failed to mint fragment on blockchain",
       });
       return;
     }
 
-    // 5. Store fragment record, add coins, and update lastCheckIn in a transaction
-    const updatedUser = await prisma.$transaction(async (tx) => {
+    // 5. Mint MockIDRX tokens on-chain
+    let mockIDRXTxHash: string;
+    try {
+      mockIDRXTxHash = await mintMockIDRX(walletAddress, mockIDRXReward);
+    } catch (error) {
+      console.error("Blockchain MockIDRX mint failed:", error);
+      res.status(500).json({
+        error: "Failed to mint MockIDRX tokens on blockchain",
+        fragmentTxHash, // Fragment was minted successfully
+      });
+      return;
+    }
+
+    // 6. Store fragment record and update lastCheckIn in a transaction
+    await prisma.$transaction(async (tx) => {
       await tx.fragment.create({
         data: {
           userId,
           typeId: fragmentType,
-          txHash,
+          txHash: fragmentTxHash,
         },
       });
 
-      return await tx.user.update({
+      await tx.user.update({
         where: { id: userId },
         data: {
           lastCheckIn: now,
-          coins: { increment: coinsReward }, // Add coins to user balance
         },
       });
     });
 
-    // 6. Return success response with all rewards
+    // 7. Get updated MockIDRX balance from blockchain
+    const mockIDRXBalance = await getMockIDRXBalance(walletAddress);
+
+    // 8. Return success response with all rewards
     res.status(200).json({
       success: true,
       rewards: {
         fragment: {
           type: fragmentType,
-          txHash,
+          txHash: fragmentTxHash,
         },
-        coins: {
-          earned: coinsReward,
-          total: updatedUser.coins,
+        mockIDRX: {
+          earned: mockIDRXReward,
+          total: mockIDRXBalance,
+          txHash: mockIDRXTxHash,
         },
       },
-      message: `Check-in successful! Earned ${coinsReward} coins and 1 fragment.`,
+      message: `Check-in successful! Earned ${mockIDRXReward} IDRX and 1 fragment.`,
     });
   } catch (error) {
     console.error("Check-in error:", error);
