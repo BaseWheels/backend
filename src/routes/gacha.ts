@@ -1,8 +1,8 @@
 import { Router, Request, Response } from "express";
 import { prisma } from "../lib/prisma";
 import { auth, AuthRequest } from "../middleware/auth";
-import { mintCar, getMockIDRXBalance, verifyBurnTransaction } from "../blockchain/client";
-import { GACHA_BOXES, selectRandomReward } from "../config/gacha";
+import { mintCar, mintFragment, getMockIDRXBalance, verifyBurnTransaction } from "../blockchain/client";
+import { GACHA_BOXES, selectRandomReward, FRAGMENT_NAMES, CarReward, FragmentReward } from "../config/gacha";
 
 const router = Router();
 
@@ -59,57 +59,112 @@ router.post("/gacha/open", auth, async (req: Request, res: Response) => {
     // 5. Randomly select a reward
     const reward = selectRandomReward(gachaBox.rewards);
 
-    // 6. Mint Car NFT on-chain (contract auto-generates tokenId)
-    let tokenId: number;
+    // 6. Mint reward based on type (Car NFT or Fragment)
     let txHash: string;
-    try {
-      const result = await mintCar(walletAddress);
-      tokenId = result.tokenId;
-      txHash = result.txHash;
-    } catch (error) {
-      console.error("Blockchain mint failed:", error);
-      // CRITICAL: MockIDRX already burned! Log this for manual recovery
-      console.error(`CRITICAL: User ${walletAddress} burned ${gachaBox.costCoins} IDRX but mint failed!`);
-      console.error(`Burn TX: ${burnTxHash}`);
-      res.status(500).json({
-        error: "Failed to mint Car NFT on blockchain",
-        burnTxHash,
-        message: "MockIDRX was burned but car minting failed. Contact support.",
+    let rewardResponse: object;
+
+    if (reward.rewardType === "car") {
+      // Mint Car NFT
+      const carReward = reward as CarReward;
+      let tokenId: number;
+      try {
+        const result = await mintCar(walletAddress);
+        tokenId = result.tokenId;
+        txHash = result.txHash;
+      } catch (error) {
+        console.error("Blockchain mint failed:", error);
+        console.error(`CRITICAL: User ${walletAddress} burned ${gachaBox.costCoins} IDRX but mint failed!`);
+        console.error(`Burn TX: ${burnTxHash}`);
+        res.status(500).json({
+          error: "Failed to mint Car NFT on blockchain",
+          burnTxHash,
+          message: "MockIDRX was burned but car minting failed. Contact support.",
+        });
+        return;
+      }
+
+      // Store car record in database
+      await prisma.car.create({
+        data: {
+          tokenId,
+          ownerId: userId,
+          modelName: carReward.modelName,
+          series: carReward.series,
+          mintTxHash: txHash,
+        },
       });
-      return;
+
+      rewardResponse = {
+        rewardType: "car",
+        tokenId,
+        modelName: carReward.modelName,
+        series: carReward.series,
+        rarity: carReward.rarity,
+        txHash,
+      };
+    } else {
+      // Mint Fragment
+      const fragmentReward = reward as FragmentReward;
+      try {
+        txHash = await mintFragment(walletAddress, fragmentReward.fragmentType, fragmentReward.amount);
+      } catch (error) {
+        console.error("Blockchain mint failed:", error);
+        console.error(`CRITICAL: User ${walletAddress} burned ${gachaBox.costCoins} IDRX but fragment mint failed!`);
+        console.error(`Burn TX: ${burnTxHash}`);
+        res.status(500).json({
+          error: "Failed to mint Fragment on blockchain",
+          burnTxHash,
+          message: "MockIDRX was burned but fragment minting failed. Contact support.",
+        });
+        return;
+      }
+
+      // Store fragment records in database (one record per fragment amount)
+      const fragmentRecords = [];
+      for (let i = 0; i < fragmentReward.amount; i++) {
+        fragmentRecords.push({
+          userId,
+          typeId: fragmentReward.fragmentType,
+          brand: fragmentReward.brand,
+          series: fragmentReward.series,
+          rarity: fragmentReward.rarity,
+          txHash,
+        });
+      }
+      await prisma.fragment.createMany({ data: fragmentRecords });
+
+      const fragmentName = FRAGMENT_NAMES[fragmentReward.fragmentType];
+      rewardResponse = {
+        rewardType: "fragment",
+        fragmentType: fragmentReward.fragmentType,
+        fragmentName,
+        brand: fragmentReward.brand,
+        series: fragmentReward.series,
+        amount: fragmentReward.amount,
+        rarity: fragmentReward.rarity,
+        txHash,
+      };
     }
 
-    // 7. Store car record in database
-    await prisma.car.create({
-      data: {
-        tokenId,
-        ownerId: userId,
-        modelName: reward.modelName,
-        series: reward.series,
-        mintTxHash: txHash,
-      },
-    });
-
-    // 8. Get updated MockIDRX balance
+    // 7. Get updated MockIDRX balance
     const updatedBalance = await getMockIDRXBalance(walletAddress);
+
+    // 8. Build success message
+    const message = reward.rewardType === "car"
+      ? `Congratulations! You got a ${reward.rarity} ${(reward as CarReward).modelName}!`
+      : `Congratulations! You got ${(reward as FragmentReward).amount}x ${reward.rarity} ${(reward as FragmentReward).brand} ${FRAGMENT_NAMES[(reward as FragmentReward).fragmentType]} Fragment!`;
 
     // 9. Return success response
     res.status(200).json({
       success: true,
       boxType,
-      reward: {
-        tokenId,
-        modelName: reward.modelName,
-        series: reward.series,
-        rarity: reward.rarity,
-        txHash,
-      },
+      reward: rewardResponse,
       mockIDRX: {
         spent: gachaBox.costCoins,
         remaining: updatedBalance,
         burnTxHash,
       },
-      message: `Congratulations! You got a ${reward.rarity} ${reward.modelName}!`,
+      message,
     });
   } catch (error) {
     console.error("Gacha error:", error);
@@ -143,12 +198,30 @@ router.get("/gacha/boxes", auth, async (req: Request, res: Response) => {
       type: key,
       costCoins: box.costCoins,
       canAfford: mockIDRXBalance >= box.costCoins,
-      rewards: box.rewards.map((r) => ({
-        rarity: r.rarity,
-        modelName: r.modelName,
-        series: r.series,
-        probability: `${r.probability}%`,
-      })),
+      rewards: box.rewards.map((r) => {
+        if (r.rewardType === "car") {
+          const carReward = r as CarReward;
+          return {
+            rewardType: "car",
+            rarity: carReward.rarity,
+            modelName: carReward.modelName,
+            series: carReward.series,
+            probability: `${carReward.probability}%`,
+          };
+        } else {
+          const fragmentReward = r as FragmentReward;
+          return {
+            rewardType: "fragment",
+            rarity: fragmentReward.rarity,
+            fragmentType: fragmentReward.fragmentType,
+            fragmentName: FRAGMENT_NAMES[fragmentReward.fragmentType],
+            brand: fragmentReward.brand,
+            series: fragmentReward.series,
+            amount: fragmentReward.amount,
+            probability: `${fragmentReward.probability}%`,
+          };
+        }
+      }),
     }));
 
     res.status(200).json({

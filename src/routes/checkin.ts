@@ -2,6 +2,14 @@ import { Router, Request, Response } from "express";
 import { prisma } from "../lib/prisma";
 import { auth, AuthRequest } from "../middleware/auth";
 import { mintFragment, mintMockIDRX, getMockIDRXBalance } from "../blockchain/client";
+import { FRAGMENT_TYPES, FragmentType } from "../config/gacha";
+
+// Daily check-in fragment reward pool
+const DAILY_FRAGMENT_REWARDS = [
+  { brand: "Honda Civic", series: "Economy", rarity: "common" as const },
+  { brand: "Toyota Corolla", series: "Economy", rarity: "common" as const },
+  { brand: "BMW M3", series: "Sport", rarity: "rare" as const },
+] as const;
 
 const router = Router();
 
@@ -48,6 +56,9 @@ router.post("/check-in", auth, async (req: Request, res: Response) => {
     const fragmentType = Math.floor(Math.random() * 5); // Fragment type: 0-4
     const mockIDRXReward = Math.floor(Math.random() * 41) + 10; // MockIDRX: 10-50
 
+    // Randomly select fragment attributes from daily reward pool
+    const fragmentReward = DAILY_FRAGMENT_REWARDS[Math.floor(Math.random() * DAILY_FRAGMENT_REWARDS.length)]!;
+
     // 4. Mint fragment on-chain
     let fragmentTxHash: string;
     try {
@@ -79,6 +90,9 @@ router.post("/check-in", auth, async (req: Request, res: Response) => {
         data: {
           userId,
           typeId: fragmentType,
+          brand: fragmentReward.brand,
+          series: fragmentReward.series,
+          rarity: fragmentReward.rarity,
           txHash: fragmentTxHash,
         },
       });

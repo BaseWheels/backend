@@ -3,12 +3,48 @@
  * Defines gacha box types, costs, and reward probabilities
  */
 
-export interface GachaReward {
+// Fragment type constants (matches smart contract)
+export const FRAGMENT_TYPES = {
+  CHASSIS: 0,
+  WHEELS: 1,
+  ENGINE: 2,
+  BODY: 3,
+  INTERIOR: 4,
+} as const;
+
+export type FragmentType = typeof FRAGMENT_TYPES[keyof typeof FRAGMENT_TYPES];
+
+export const FRAGMENT_NAMES: Record<FragmentType, string> = {
+  [FRAGMENT_TYPES.CHASSIS]: "Chassis",
+  [FRAGMENT_TYPES.WHEELS]: "Wheels",
+  [FRAGMENT_TYPES.ENGINE]: "Engine",
+  [FRAGMENT_TYPES.BODY]: "Body",
+  [FRAGMENT_TYPES.INTERIOR]: "Interior",
+};
+
+// Base reward interface
+interface BaseReward {
   rarity: "common" | "rare" | "epic" | "legendary";
-  modelName: string;
-  series: string;
   probability: number; // 0-100
 }
+
+// Car reward
+export interface CarReward extends BaseReward {
+  rewardType: "car";
+  modelName: string;
+  series: string;
+}
+
+// Fragment reward
+export interface FragmentReward extends BaseReward {
+  rewardType: "fragment";
+  fragmentType: FragmentType;
+  amount: number;
+  brand: string;   // Car brand this fragment belongs to (e.g., "Honda Civic")
+  series: string;  // Car series (e.g., "Economy", "Sport")
+}
+
+export type GachaReward = CarReward | FragmentReward;
 
 export interface GachaBox {
   type: "standard" | "premium" | "legendary";
@@ -22,32 +58,66 @@ export interface GachaBox {
 export const GACHA_BOXES: Record<string, GachaBox> = {
   standard: {
     type: "standard",
-    costCoins: 50,
+    costCoins: 25000,
     rewards: [
-      { rarity: "common", modelName: "Honda Civic", series: "Economy", probability: 50 },
-      { rarity: "common", modelName: "Toyota Corolla", series: "Economy", probability: 30 },
-      { rarity: "rare", modelName: "BMW M3", series: "Sport", probability: 15 },
-      { rarity: "rare", modelName: "Audi A4", series: "Luxury", probability: 5 },
+      // Honda Civic Fragments (Economy)
+      { rewardType: "fragment", rarity: "common", fragmentType: FRAGMENT_TYPES.CHASSIS, amount: 1, probability: 12, brand: "Honda Civic", series: "Economy" },
+      { rewardType: "fragment", rarity: "common", fragmentType: FRAGMENT_TYPES.WHEELS, amount: 1, probability: 12, brand: "Honda Civic", series: "Economy" },
+      { rewardType: "fragment", rarity: "common", fragmentType: FRAGMENT_TYPES.BODY, amount: 1, probability: 10, brand: "Honda Civic", series: "Economy" },
+      { rewardType: "fragment", rarity: "common", fragmentType: FRAGMENT_TYPES.ENGINE, amount: 1, probability: 8, brand: "Honda Civic", series: "Economy" },
+      { rewardType: "fragment", rarity: "common", fragmentType: FRAGMENT_TYPES.INTERIOR, amount: 1, probability: 8, brand: "Honda Civic", series: "Economy" },
+      // Toyota Corolla Fragments (Economy)
+      { rewardType: "fragment", rarity: "common", fragmentType: FRAGMENT_TYPES.CHASSIS, amount: 1, probability: 6, brand: "Toyota Corolla", series: "Economy" },
+      { rewardType: "fragment", rarity: "common", fragmentType: FRAGMENT_TYPES.WHEELS, amount: 1, probability: 6, brand: "Toyota Corolla", series: "Economy" },
+      { rewardType: "fragment", rarity: "common", fragmentType: FRAGMENT_TYPES.BODY, amount: 1, probability: 5, brand: "Toyota Corolla", series: "Economy" },
+      { rewardType: "fragment", rarity: "common", fragmentType: FRAGMENT_TYPES.ENGINE, amount: 1, probability: 4, brand: "Toyota Corolla", series: "Economy" },
+      { rewardType: "fragment", rarity: "common", fragmentType: FRAGMENT_TYPES.INTERIOR, amount: 1, probability: 4, brand: "Toyota Corolla", series: "Economy" },
+      // Cars (15% total)
+      { rewardType: "car", rarity: "common", modelName: "Honda Civic", series: "Economy", probability: 5 },
+      { rewardType: "car", rarity: "common", modelName: "Toyota Corolla", series: "Economy", probability: 5 },
+      { rewardType: "car", rarity: "rare", modelName: "BMW M3", series: "Sport", probability: 5 },
     ],
   },
   premium: {
     type: "premium",
-    costCoins: 150,
+    costCoins: 35000,
     rewards: [
-      { rarity: "rare", modelName: "Porsche 911", series: "Sport", probability: 40 },
-      { rarity: "rare", modelName: "Mercedes AMG", series: "Luxury", probability: 30 },
-      { rarity: "epic", modelName: "Ferrari F8", series: "Supercar", probability: 20 },
-      { rarity: "epic", modelName: "Lamborghini Huracan", series: "Supercar", probability: 10 },
+      // Porsche 911 Fragments (Sport)
+      { rewardType: "fragment", rarity: "rare", fragmentType: FRAGMENT_TYPES.CHASSIS, amount: 1, probability: 10, brand: "Porsche 911", series: "Sport" },
+      { rewardType: "fragment", rarity: "rare", fragmentType: FRAGMENT_TYPES.WHEELS, amount: 1, probability: 10, brand: "Porsche 911", series: "Sport" },
+      { rewardType: "fragment", rarity: "rare", fragmentType: FRAGMENT_TYPES.BODY, amount: 1, probability: 8, brand: "Porsche 911", series: "Sport" },
+      { rewardType: "fragment", rarity: "rare", fragmentType: FRAGMENT_TYPES.ENGINE, amount: 1, probability: 6, brand: "Porsche 911", series: "Sport" },
+      { rewardType: "fragment", rarity: "rare", fragmentType: FRAGMENT_TYPES.INTERIOR, amount: 1, probability: 6, brand: "Porsche 911", series: "Sport" },
+      // Ferrari F8 Fragments (Supercar)
+      { rewardType: "fragment", rarity: "epic", fragmentType: FRAGMENT_TYPES.CHASSIS, amount: 1, probability: 5, brand: "Ferrari F8", series: "Supercar" },
+      { rewardType: "fragment", rarity: "epic", fragmentType: FRAGMENT_TYPES.WHEELS, amount: 1, probability: 5, brand: "Ferrari F8", series: "Supercar" },
+      // Cars (50% total)
+      { rewardType: "car", rarity: "rare", modelName: "Porsche 911", series: "Sport", probability: 20 },
+      { rewardType: "car", rarity: "rare", modelName: "Mercedes AMG", series: "Luxury", probability: 10 },
+      { rewardType: "car", rarity: "epic", modelName: "Ferrari F8", series: "Supercar", probability: 10 },
+      { rewardType: "car", rarity: "epic", modelName: "Lamborghini Huracan", series: "Supercar", probability: 10 },
     ],
   },
   legendary: {
     type: "legendary",
-    costCoins: 500,
+    costCoins: 50000,
     rewards: [
-      { rarity: "epic", modelName: "McLaren 720S", series: "Hypercar", probability: 50 },
-      { rarity: "legendary", modelName: "Bugatti Chiron", series: "Hypercar", probability: 30 },
-      { rarity: "legendary", modelName: "Koenigsegg Jesko", series: "Hypercar", probability: 15 },
-      { rarity: "legendary", modelName: "Pagani Huayra", series: "Limited Edition", probability: 5 },
+      // McLaren 720S Fragments (Hypercar)
+      { rewardType: "fragment", rarity: "epic", fragmentType: FRAGMENT_TYPES.CHASSIS, amount: 1, probability: 8, brand: "McLaren 720S", series: "Hypercar" },
+      { rewardType: "fragment", rarity: "epic", fragmentType: FRAGMENT_TYPES.WHEELS, amount: 1, probability: 8, brand: "McLaren 720S", series: "Hypercar" },
+      { rewardType: "fragment", rarity: "epic", fragmentType: FRAGMENT_TYPES.BODY, amount: 1, probability: 6, brand: "McLaren 720S", series: "Hypercar" },
+      { rewardType: "fragment", rarity: "epic", fragmentType: FRAGMENT_TYPES.ENGINE, amount: 1, probability: 4, brand: "McLaren 720S", series: "Hypercar" },
+      { rewardType: "fragment", rarity: "epic", fragmentType: FRAGMENT_TYPES.INTERIOR, amount: 1, probability: 4, brand: "McLaren 720S", series: "Hypercar" },
+      // Bugatti Chiron Fragments (Hypercar)
+      { rewardType: "fragment", rarity: "legendary", fragmentType: FRAGMENT_TYPES.CHASSIS, amount: 1, probability: 3, brand: "Bugatti Chiron", series: "Hypercar" },
+      { rewardType: "fragment", rarity: "legendary", fragmentType: FRAGMENT_TYPES.WHEELS, amount: 1, probability: 3, brand: "Bugatti Chiron", series: "Hypercar" },
+      { rewardType: "fragment", rarity: "legendary", fragmentType: FRAGMENT_TYPES.ENGINE, amount: 1, probability: 2, brand: "Bugatti Chiron", series: "Hypercar" },
+      { rewardType: "fragment", rarity: "legendary", fragmentType: FRAGMENT_TYPES.BODY, amount: 1, probability: 2, brand: "Bugatti Chiron", series: "Hypercar" },
+      // Cars (60% total)
+      { rewardType: "car", rarity: "epic", modelName: "McLaren 720S", series: "Hypercar", probability: 25 },
+      { rewardType: "car", rarity: "legendary", modelName: "Bugatti Chiron", series: "Hypercar", probability: 20 },
+      { rewardType: "car", rarity: "legendary", modelName: "Koenigsegg Jesko", series: "Hypercar", probability: 10 },
+      { rewardType: "car", rarity: "legendary", modelName: "Pagani Huayra", series: "Limited Edition", probability: 5 },
     ],
   },
 };

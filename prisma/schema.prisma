@@ -20,10 +20,16 @@ model User {
 model Fragment {
   id        Int      @id @default(autoincrement())
   userId    String
-  typeId    Int
+  typeId    Int      // 0=CHASSIS, 1=WHEELS, 2=ENGINE, 3=BODY, 4=INTERIOR
+  brand     String   // Car brand (e.g., "Honda Civic", "BMW M3")
+  series    String   // Car series (e.g., "Economy", "Sport")
+  rarity    String   // common, rare, epic, legendary
   txHash    String?
+  isUsed    Boolean  @default(false) // true if used for assembly
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id])
+
+  @@index([userId, brand, isUsed]) // For efficient assembly queries
 }
 
 model Car {
