@@ -8,13 +8,15 @@ datasource db {
 }
 
 model User {
-  id            String     @id
-  walletAddress String     @unique
-  coins         Int        @default(0)
-  lastCheckIn   DateTime   @default(now())
-  createdAt     DateTime   @default(now())
-  fragments     Fragment[]
-  cars          Car[]
+  id              String     @id
+  walletAddress   String     @unique
+  coins           Int        @default(0)
+  lastCheckIn     DateTime   @default(now())
+  createdAt       DateTime   @default(now())
+  fragments       Fragment[]
+  cars            Car[]
+  sellerListings  Listing[]  @relation("SellerListings")
+  buyerPurchases  Listing[]  @relation("BuyerPurchases")
 }
 
 model Fragment {
@@ -40,4 +42,25 @@ model Car {
   isRedeemed  Boolean  @default(false)
   mintTxHash  String?
   user        User     @relation(fields: [ownerId], references: [id])
+  listing     Listing?
+}
+
+model Listing {
+  id          Int       @id @default(autoincrement())
+  carTokenId  Int       @unique
+  sellerId    String
+  price       Int
+  status      String    @default("active")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  soldAt      DateTime?
+  buyerId     String?
+  txHash      String?
+
+  seller      User      @relation("SellerListings", fields: [sellerId], references: [id])
+  buyer       User?     @relation("BuyerPurchases", fields: [buyerId], references: [id])
+  car         Car       @relation(fields: [carTokenId], references: [tokenId])
+
+  @@index([status, createdAt])
+  @@index([sellerId])
 }
