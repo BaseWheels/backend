@@ -80,36 +80,94 @@ export async function executePurchase(
   price: number
 ): Promise<{ txHash: string }> {
   try {
+    console.log("=== executePurchase START ===");
+    console.log("TokenId:", tokenId);
+    console.log("Buyer:", buyerAddress);
+    console.log("Seller:", sellerAddress);
+    console.log("Price:", price);
+    console.log("Backend wallet:", wallet.address);
+
     // Get decimals for IDRX
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const decimals: number = await (mockIDRXContract as any).decimals();
     const priceWei = ethers.parseUnits(price.toString(), decimals);
+    console.log("Price in wei:", priceWei.toString());
+
+    // Verify allowance before transfer
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const allowance = await (mockIDRXContract as any).allowance(buyerAddress, wallet.address);
+    console.log("Buyer allowance to backend:", allowance.toString());
+    if (allowance < priceWei) {
+      throw new Error(`Insufficient allowance. Has: ${allowance.toString()}, Needs: ${priceWei.toString()}`);
+    }
+
+    // Verify buyer balance
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const buyerBalance = await (mockIDRXContract as any).balanceOf(buyerAddress);
+    console.log("Buyer IDRX balance:", buyerBalance.toString());
+    if (buyerBalance < priceWei) {
+      throw new Error(`Insufficient balance. Has: ${buyerBalance.toString()}, Needs: ${priceWei.toString()}`);
+    }
 
     // Step 1: Transfer IDRX from buyer to seller
     console.log(`Transferring ${price} IDRX from ${buyerAddress} to ${sellerAddress}...`);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const idrxTx = await (mockIDRXContract as any).transferFrom(
-      buyerAddress,
-      sellerAddress,
-      priceWei
-    );
-    await idrxTx.wait();
-    console.log(`IDRX transfer successful: ${idrxTx.hash}`);
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const idrxTx = await (mockIDRXContract as any).transferFrom(
+        buyerAddress,
+        sellerAddress,
+        priceWei
+      );
+      console.log("IDRX transfer tx sent:", idrxTx.hash);
+      const idrxReceipt = await idrxTx.wait();
+      console.log(`IDRX transfer confirmed. Gas used: ${idrxReceipt.gasUsed.toString()}`);
+    } catch (error) {
+      console.error("IDRX transfer failed:", error);
+      throw new Error(`IDRX transfer failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
 
     // Step 2: Transfer car from seller to buyer
     console.log(`Transferring car tokenId ${tokenId} from ${sellerAddress} to ${buyerAddress}...`);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const carTx = await (carContract as any).transferFrom(
-      sellerAddress,
-      buyerAddress,
-      tokenId
-    );
-    const receipt = await carTx.wait();
-    console.log(`Car transfer successful: ${receipt.hash}`);
 
-    return { txHash: receipt.hash };
+    // Verify car ownership before transfer
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const currentOwner = await (carContract as any).ownerOf(tokenId);
+    console.log("Current car owner:", currentOwner);
+    if (currentOwner.toLowerCase() !== sellerAddress.toLowerCase()) {
+      throw new Error(`Seller doesn't own the car. Current owner: ${currentOwner}`);
+    }
+
+    // Verify car approval
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const approvedAddress = await (carContract as any).getApproved(tokenId);
+    console.log("Car approved to:", approvedAddress);
+    if (approvedAddress.toLowerCase() !== wallet.address.toLowerCase()) {
+      throw new Error(`Car not approved to backend wallet. Approved to: ${approvedAddress}`);
+    }
+
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const carTx = await (carContract as any).transferFrom(
+        sellerAddress,
+        buyerAddress,
+        tokenId
+      );
+      console.log("Car transfer tx sent:", carTx.hash);
+      const carReceipt = await carTx.wait();
+      console.log(`Car transfer confirmed. Gas used: ${carReceipt.gasUsed.toString()}`);
+      console.log("=== executePurchase SUCCESS ===");
+
+      return { txHash: carReceipt.hash };
+    } catch (error) {
+      console.error("Car transfer failed:", error);
+      // CRITICAL: IDRX already transferred! Manual intervention may be needed
+      console.error("⚠️ CRITICAL: IDRX transfer succeeded but car transfer failed!");
+      console.error("⚠️ Buyer paid but didn't receive car. Manual fix required!");
+      throw new Error(`Car transfer failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
   } catch (error) {
     console.error("Execute purchase error:", error);
+    console.error("=== executePurchase FAILED ===");
     throw new Error(
       `Failed to execute marketplace purchase on-chain: ${
         error instanceof Error ? error.message : "Unknown error"

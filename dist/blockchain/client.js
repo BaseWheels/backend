@@ -1,10 +1,14 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.carContract = exports.fragmentContract = exports.wallet = exports.provider = void 0;
+exports.carContract = exports.fragmentContract = exports.mockIDRXContract = exports.wallet = exports.provider = void 0;
 exports.mintFragment = mintFragment;
 exports.mintCar = mintCar;
 exports.checkAllParts = checkAllParts;
 exports.burnForAssembly = burnForAssembly;
+exports.getMockIDRXBalance = getMockIDRXBalance;
+exports.mintMockIDRX = mintMockIDRX;
+exports.verifyBurnTransaction = verifyBurnTransaction;
+exports.burnMockIDRX = burnMockIDRX;
 const ethers_1 = require("ethers");
 const config_1 = require("./config");
 if (!process.env.RPC_URL) {
@@ -15,6 +19,8 @@ if (!process.env.BACKEND_PRIVATE_KEY) {
 }
 exports.provider = new ethers_1.ethers.JsonRpcProvider(process.env.RPC_URL);
 exports.wallet = new ethers_1.ethers.Wallet(process.env.BACKEND_PRIVATE_KEY, exports.provider);
+// MockIDRX Token Contract (ERC20)
+exports.mockIDRXContract = new ethers_1.ethers.Contract(config_1.MOCKIDRX_CONTRACT_ADDRESS, config_1.MOCKIDRX_CONTRACT_ABI, exports.wallet);
 // Fragment Contract (ERC1155)
 exports.fragmentContract = new ethers_1.ethers.Contract(config_1.FRAGMENT_CONTRACT_ADDRESS, config_1.FRAGMENT_CONTRACT_ABI, exports.wallet);
 // Car Contract (ERC721)
@@ -112,6 +118,127 @@ async function burnForAssembly(fromAddress) {
     catch (error) {
         console.error("Burn for assembly error:", error);
         throw new Error("Failed to burn fragments on-chain");
+    }
+}
+/**
+ * Get MockIDRX token balance for a user
+ * @param userAddress - User wallet address
+ * @returns Balance in token units (e.g., 100.5 IDRX)
+ */
+async function getMockIDRXBalance(userAddress) {
+    try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const balance = await exports.mockIDRXContract.balanceOf(userAddress);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const decimals = await exports.mockIDRXContract.decimals();
+        // Convert from wei to token units
+        return parseFloat(ethers_1.ethers.formatUnits(balance, decimals));
+    }
+    catch (error) {
+        console.error("Get MockIDRX balance error:", error);
+        throw new Error("Failed to get MockIDRX balance on-chain");
+    }
+}
+/**
+ * Mint MockIDRX tokens to a user (for check-in rewards)
+ * @param toAddress - Recipient wallet address
+ * @param amount - Amount of tokens to mint (in token units, e.g., 10 = 10 IDRX)
+ * @returns Transaction hash
+ * @note Requires backend wallet to be contract owner
+ */
+async function mintMockIDRX(toAddress, amount) {
+    try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const decimals = await exports.mockIDRXContract.decimals();
+        const amountInWei = ethers_1.ethers.parseUnits(amount.toString(), decimals);
+        // Use mintTreasury (owner only)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const tx = await exports.mockIDRXContract.mintTreasury(toAddress, amountInWei);
+        const receipt = await tx.wait();
+        return receipt.hash;
+    }
+    catch (error) {
+        console.error("Mint MockIDRX error:", error);
+        throw new Error("Failed to mint MockIDRX on-chain");
+    }
+}
+/**
+ * Verify a burn transaction on-chain
+ * @param txHash - Transaction hash to verify
+ * @param expectedBurner - Expected address that burned tokens
+ * @param expectedAmount - Expected amount burned (in token units)
+ * @returns True if burn is valid
+ */
+async function verifyBurnTransaction(txHash, expectedBurner, expectedAmount) {
+    try {
+        // Get transaction receipt
+        const receipt = await exports.provider.getTransactionReceipt(txHash);
+        if (!receipt) {
+            throw new Error("Transaction not found");
+        }
+        if (!receipt.status) {
+            throw new Error("Transaction failed");
+        }
+        // Check if transaction is to MockIDRX contract
+        if (receipt.to?.toLowerCase() !== config_1.MOCKIDRX_CONTRACT_ADDRESS.toLowerCase()) {
+            throw new Error("Transaction not to MockIDRX contract");
+        }
+        // Parse logs for TokenBurned event
+        const iface = exports.mockIDRXContract.interface;
+        const decimals = await exports.mockIDRXContract.decimals();
+        const expectedAmountInWei = ethers_1.ethers.parseUnits(expectedAmount.toString(), decimals);
+        for (const log of receipt.logs) {
+            try {
+                const parsed = iface.parseLog({ topics: log.topics, data: log.data });
+                // Check for TokenBurned event
+                if (parsed && parsed.name === "TokenBurned") {
+                    const burner = parsed.args[0];
+                    const amount = parsed.args[1];
+                    // Verify burner and amount
+                    if (burner.toLowerCase() === expectedBurner.toLowerCase() &&
+                        amount >= expectedAmountInWei) {
+                        return true;
+                    }
+                }
+            }
+            catch {
+                // Skip logs that don't match
+                continue;
+            }
+        }
+        throw new Error("No valid TokenBurned event found in transaction");
+    }
+    catch (error) {
+        console.error("Verify burn transaction error:", error);
+        throw new Error(`Failed to verify burn transaction: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+}
+/**
+ * Burn MockIDRX tokens from a user (for gacha purchases)
+ * @deprecated Use verifyBurnTransaction instead - let user burn on frontend
+ * @param fromAddress - User wallet address to burn tokens from
+ * @param amount - Amount of tokens to burn (in token units, e.g., 100 = 100 IDRX)
+ * @returns Transaction hash
+ * @note User must approve backend wallet first before this can work
+ */
+async function burnMockIDRX(fromAddress, amount) {
+    try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const decimals = await exports.mockIDRXContract.decimals();
+        const amountInWei = ethers_1.ethers.parseUnits(amount.toString(), decimals);
+        // Use burnFrom function (requires prior approval from user)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const burnTx = await exports.mockIDRXContract.burnFrom(fromAddress, amountInWei);
+        const receipt = await burnTx.wait();
+        return receipt.hash;
+    }
+    catch (error) {
+        console.error("Burn MockIDRX error:", error);
+        // Check if it's an approval issue
+        if (error instanceof Error && error.message.includes("insufficient allowance")) {
+            throw new Error("User must approve backend wallet to spend MockIDRX tokens");
+        }
+        throw new Error("Failed to burn MockIDRX on-chain");
     }
 }
 //# sourceMappingURL=client.js.map

@@ -1,6 +1,7 @@
 import { ethers } from "ethers";
 export declare const provider: ethers.JsonRpcProvider;
 export declare const wallet: ethers.Wallet;
+export declare const mockIDRXContract: ethers.Contract;
 export declare const fragmentContract: ethers.Contract;
 export declare const carContract: ethers.Contract;
 /**
@@ -33,4 +34,35 @@ export declare function checkAllParts(userAddress: string): Promise<boolean>;
  * @returns Transaction hash
  */
 export declare function burnForAssembly(fromAddress: string): Promise<string>;
+/**
+ * Get MockIDRX token balance for a user
+ * @param userAddress - User wallet address
+ * @returns Balance in token units (e.g., 100.5 IDRX)
+ */
+export declare function getMockIDRXBalance(userAddress: string): Promise<number>;
+/**
+ * Mint MockIDRX tokens to a user (for check-in rewards)
+ * @param toAddress - Recipient wallet address
+ * @param amount - Amount of tokens to mint (in token units, e.g., 10 = 10 IDRX)
+ * @returns Transaction hash
+ * @note Requires backend wallet to be contract owner
+ */
+export declare function mintMockIDRX(toAddress: string, amount: number): Promise<string>;
+/**
+ * Verify a burn transaction on-chain
+ * @param txHash - Transaction hash to verify
+ * @param expectedBurner - Expected address that burned tokens
+ * @param expectedAmount - Expected amount burned (in token units)
+ * @returns True if burn is valid
+ */
+export declare function verifyBurnTransaction(txHash: string, expectedBurner: string, expectedAmount: number): Promise<boolean>;
+/**
+ * Burn MockIDRX tokens from a user (for gacha purchases)
+ * @deprecated Use verifyBurnTransaction instead - let user burn on frontend
+ * @param fromAddress - User wallet address to burn tokens from
+ * @param amount - Amount of tokens to burn (in token units, e.g., 100 = 100 IDRX)
+ * @returns Transaction hash
+ * @note User must approve backend wallet first before this can work
+ */
+export declare function burnMockIDRX(fromAddress: string, amount: number): Promise<string>;
 //# sourceMappingURL=client.d.ts.map

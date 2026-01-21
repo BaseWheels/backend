@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const prisma_1 = require("../lib/prisma");
 const auth_1 = require("../middleware/auth");
+const client_1 = require("../blockchain/client");
 const router = (0, express_1.Router)();
 /**
  * GET /garage/overview
@@ -10,7 +11,7 @@ const router = (0, express_1.Router)();
  */
 router.get("/garage/overview", auth_1.auth, async (req, res) => {
     try {
-        const { userId } = req;
+        const { userId, walletAddress } = req;
         // Get user with all related data
         const user = await prisma_1.prisma.user.findUnique({
             where: { id: userId },
@@ -26,6 +27,15 @@ router.get("/garage/overview", auth_1.auth, async (req, res) => {
         if (!user) {
             res.status(404).json({ error: "User not found" });
             return;
+        }
+        // Get MockIDRX balance from blockchain
+        let mockIDRXBalance;
+        try {
+            mockIDRXBalance = await (0, client_1.getMockIDRXBalance)(walletAddress);
+        }
+        catch (error) {
+            console.error("Failed to get MockIDRX balance:", error);
+            mockIDRXBalance = 0; // Fallback to 0 if blockchain call fails
         }
         // Aggregate fragment counts by type
         const fragmentCounts = user.fragments.reduce((acc, fragment) => {
@@ -60,7 +70,7 @@ router.get("/garage/overview", auth_1.auth, async (req, res) => {
             user: {
                 id: user.id,
                 walletAddress: user.walletAddress,
-                coins: user.coins,
+                mockIDRX: mockIDRXBalance,
                 lastCheckIn: user.lastCheckIn,
                 createdAt: user.createdAt,
             },
@@ -164,64 +174,75 @@ router.get("/garage/cars", auth_1.auth, async (req, res) => {
 });
 /**
  * GET /garage/fragments
- * Get fragment inventory with counts by type
+ * Get fragment inventory grouped by brand (for assembly)
  */
 router.get("/garage/fragments", auth_1.auth, async (req, res) => {
     try {
         const { userId } = req;
-        // Get all fragments
+        // Get all unused fragments
         const fragments = await prisma_1.prisma.fragment.findMany({
-            where: { userId },
+            where: { userId, isUsed: false },
             orderBy: { createdAt: 'desc' },
         });
-        // Aggregate by type
-        const fragmentsByType = fragments.reduce((acc, fragment) => {
-            if (!acc[fragment.typeId]) {
-                acc[fragment.typeId] = [];
+        const fragmentTypeNames = {
+            0: "Chassis",
+            1: "Wheels",
+            2: "Engine",
+            3: "Body",
+            4: "Interior",
+        };
+        // Group fragments by brand
+        const fragmentsByBrand = {};
+        fragments.forEach(fragment => {
+            const key = fragment.brand;
+            if (!fragmentsByBrand[key]) {
+                fragmentsByBrand[key] = {
+                    brand: fragment.brand,
+                    series: fragment.series,
+                    rarity: fragment.rarity,
+                    fragments: [],
+                    totalParts: 0,
+                    canAssemble: false,
+                };
             }
-            acc[fragment.typeId].push({
-                id: fragment.id,
-                txHash: fragment.txHash,
-                createdAt: fragment.createdAt,
-            });
-            return acc;
-        }, {});
-        const fragmentNames = [
-            "Engine Fragment",
-            "Chassis Fragment",
-            "Wheels Fragment",
-            "Body Fragment",
-            "Electronics Fragment"
-        ];
-        const fragmentDescriptions = [
-            "The heart of any vehicle. Powers your dreams forward.",
-            "The backbone that holds everything together.",
-            "Round and round they go. Your ticket to the road.",
-            "The shell that makes heads turn.",
-            "The brain that brings it all to life."
-        ];
-        // Format response
-        const inventory = Array.from({ length: 5 }, (_, typeId) => ({
-            typeId,
-            name: fragmentNames[typeId],
-            description: fragmentDescriptions[typeId],
-            count: fragmentsByType[typeId]?.length || 0,
-            fragments: fragmentsByType[typeId] || [],
-            imageUrl: `https://your-cdn.com/fragments/${typeId}.png`, // TODO: Replace with actual CDN
-            metadataUrl: `/metadata/fragments/${typeId}`,
-        }));
-        // Check if can assemble
-        const canAssemble = inventory.every(item => item.count >= 1);
-        const missingFragments = inventory
-            .filter(item => item.count === 0)
-            .map(item => item.name);
+            // Find or create fragment type entry
+            let typeEntry = fragmentsByBrand[key].fragments.find(f => f.typeId === fragment.typeId);
+            if (!typeEntry) {
+                typeEntry = {
+                    typeId: fragment.typeId,
+                    typeName: fragmentTypeNames[fragment.typeId] || `Type ${fragment.typeId}`,
+                    count: 0,
+                    ids: [],
+                };
+                fragmentsByBrand[key].fragments.push(typeEntry);
+            }
+            typeEntry.count++;
+            typeEntry.ids.push(fragment.id);
+        });
+        // Calculate canAssemble and totalParts for each brand
+        Object.values(fragmentsByBrand).forEach(brandData => {
+            brandData.totalParts = brandData.fragments.reduce((sum, f) => sum + f.count, 0);
+            // Check if has all 5 unique fragment types (0-4)
+            const uniqueTypes = new Set(brandData.fragments.map(f => f.typeId));
+            brandData.canAssemble = uniqueTypes.size === 5;
+            // Sort fragments by typeId
+            brandData.fragments.sort((a, b) => a.typeId - b.typeId);
+        });
+        // Convert to array and sort by canAssemble (ready first) then by totalParts
+        const inventory = Object.values(fragmentsByBrand).sort((a, b) => {
+            if (a.canAssemble !== b.canAssemble)
+                return a.canAssemble ? -1 : 1;
+            return b.totalParts - a.totalParts;
+        });
+        // Find brands that can be assembled
+        const assemblableBrands = inventory.filter(b => b.canAssemble).map(b => b.brand);
         res.status(200).json({
             inventory,
             summary: {
                 totalFragments: fragments.length,
-                uniqueTypes: Object.keys(fragmentsByType).length,
-                canAssemble,
-                missingFragments,
+                totalBrands: inventory.length,
+                assemblableBrands,
+                canAssembleAny: assemblableBrands.length > 0,
             },
         });
     }

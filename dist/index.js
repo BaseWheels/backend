@@ -11,6 +11,7 @@ const gacha_1 = __importDefault(require("./routes/gacha"));
 const assembly_1 = __importDefault(require("./routes/assembly"));
 const garage_1 = __importDefault(require("./routes/garage"));
 const metadata_1 = __importDefault(require("./routes/metadata"));
+const marketplace_1 = __importDefault(require("./routes/marketplace"));
 dotenv_1.default.config();
 const app = (0, express_1.default)();
 const PORT = process.env.PORT || 3000;
@@ -26,6 +27,7 @@ app.use("/api", checkin_1.default);
 app.use("/api", gacha_1.default);
 app.use("/api", assembly_1.default);
 app.use("/api", garage_1.default);
+app.use("/api", marketplace_1.default);
 // Metadata Routes (for NFT marketplaces)
 app.use(metadata_1.default);
 // Start server

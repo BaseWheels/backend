@@ -2,12 +2,32 @@
  * Gacha Box Configuration
  * Defines gacha box types, costs, and reward probabilities
  */
-export interface GachaReward {
+export declare const FRAGMENT_TYPES: {
+    readonly CHASSIS: 0;
+    readonly WHEELS: 1;
+    readonly ENGINE: 2;
+    readonly BODY: 3;
+    readonly INTERIOR: 4;
+};
+export type FragmentType = typeof FRAGMENT_TYPES[keyof typeof FRAGMENT_TYPES];
+export declare const FRAGMENT_NAMES: Record<FragmentType, string>;
+interface BaseReward {
     rarity: "common" | "rare" | "epic" | "legendary";
-    modelName: string;
-    series: string;
     probability: number;
 }
+export interface CarReward extends BaseReward {
+    rewardType: "car";
+    modelName: string;
+    series: string;
+}
+export interface FragmentReward extends BaseReward {
+    rewardType: "fragment";
+    fragmentType: FragmentType;
+    amount: number;
+    brand: string;
+    series: string;
+}
+export type GachaReward = CarReward | FragmentReward;
 export interface GachaBox {
     type: "standard" | "premium" | "legendary";
     costCoins: number;
@@ -26,4 +46,5 @@ export declare function selectRandomReward(rewards: GachaReward[]): GachaReward;
  * Using timestamp + random number to ensure uniqueness
  */
 export declare function generateTokenId(): number;
+export {};
 //# sourceMappingURL=gacha.d.ts.map

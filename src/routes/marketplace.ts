@@ -20,6 +20,12 @@ router.post("/marketplace/list", auth, async (req: Request, res: Response) => {
     const { userId, walletAddress } = req as AuthRequest;
     const { tokenId, price } = req.body;
 
+    // 0. Validate auth
+    if (!userId || !walletAddress) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+
     // 1. Validate input
     if (!tokenId || typeof tokenId !== "number") {
       res.status(400).json({
@@ -72,7 +78,7 @@ router.post("/marketplace/list", auth, async (req: Request, res: Response) => {
     }
 
     // 4. Verify on-chain ownership
-    const ownsOnChain = await verifyCarOwnership(tokenId, walletAddress);
+    const ownsOnChain = await verifyCarOwnership(tokenId, walletAddress as string);
     if (!ownsOnChain) {
       res.status(400).json({
         error: "On-chain verification failed: you do not own this car",
@@ -222,7 +228,13 @@ router.get("/marketplace/listings", auth, async (req: Request, res: Response) =>
 router.post("/marketplace/buy/:listingId", auth, async (req: Request, res: Response) => {
   try {
     const { userId: buyerUserId, walletAddress: buyerWallet } = req as AuthRequest;
-    const listingId = parseInt(req.params.listingId);
+    const listingId = parseInt(req.params.listingId as string);
+
+    // 0. Validate auth
+    if (!buyerUserId || !buyerWallet) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
 
     if (isNaN(listingId)) {
       res.status(400).json({ error: "Invalid listing ID" });
@@ -270,7 +282,7 @@ router.post("/marketplace/buy/:listingId", auth, async (req: Request, res: Respo
 
     // STEP 2: Verify buyer has sufficient IDRX balance
     try {
-      const balance = await getMockIDRXBalance(buyerWallet);
+      const balance = await getMockIDRXBalance(buyerWallet as string);
       if (balance < listing.price) {
         // Rollback to active
         await prisma.listing.update({
@@ -300,7 +312,7 @@ router.post("/marketplace/buy/:listingId", auth, async (req: Request, res: Respo
     }
 
     // STEP 3: Verify buyer has approved IDRX spending
-    const hasAllowance = await verifyIDRXAllowance(buyerWallet, listing.price);
+    const hasAllowance = await verifyIDRXAllowance(buyerWallet as string, listing.price);
     if (!hasAllowance) {
       // Rollback to active
       await prisma.listing.update({
@@ -350,7 +362,7 @@ router.post("/marketplace/buy/:listingId", auth, async (req: Request, res: Respo
     try {
       const result = await executePurchase(
         listing.carTokenId,
-        buyerWallet,
+        buyerWallet as string,
         listing.seller.walletAddress,
         listing.price
       );
@@ -396,7 +408,7 @@ router.post("/marketplace/buy/:listingId", auth, async (req: Request, res: Respo
           price: listing.price,
           txHash: txHash,
           seller: listing.seller.walletAddress,
-          buyer: buyerWallet,
+          buyer: buyerWallet as string,
         },
         message: "Purchase successful!",
       });
@@ -427,7 +439,7 @@ router.post("/marketplace/buy/:listingId", auth, async (req: Request, res: Respo
 router.delete("/marketplace/cancel/:listingId", auth, async (req: Request, res: Response) => {
   try {
     const { userId } = req as AuthRequest;
-    const listingId = parseInt(req.params.listingId);
+    const listingId = parseInt(req.params.listingId as string);
 
     if (isNaN(listingId)) {
       res.status(400).json({ error: "Invalid listing ID" });
@@ -545,7 +557,7 @@ router.get("/marketplace/my-listings", auth, async (req: Request, res: Response)
  */
 router.get("/marketplace/listing/:listingId", auth, async (req: Request, res: Response) => {
   try {
-    const listingId = parseInt(req.params.listingId);
+    const listingId = parseInt(req.params.listingId as string);
 
     if (isNaN(listingId)) {
       res.status(400).json({ error: "Invalid listing ID" });

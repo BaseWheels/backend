@@ -4,6 +4,12 @@ const express_1 = require("express");
 const prisma_1 = require("../lib/prisma");
 const auth_1 = require("../middleware/auth");
 const client_1 = require("../blockchain/client");
+// Daily check-in fragment reward pool
+const DAILY_FRAGMENT_REWARDS = [
+    { brand: "Honda Civic", series: "Economy", rarity: "common" },
+    { brand: "Toyota Corolla", series: "Economy", rarity: "common" },
+    { brand: "BMW M3", series: "Sport", rarity: "rare" },
+];
 const router = (0, express_1.Router)();
 /**
  * POST /check-in
@@ -40,50 +46,70 @@ router.post("/check-in", auth_1.auth, async (req, res) => {
         }
         // 3. Randomly select rewards
         const fragmentType = Math.floor(Math.random() * 5); // Fragment type: 0-4
-        const coinsReward = Math.floor(Math.random() * 41) + 10; // Coins: 10-50
+        const mockIDRXReward = Math.floor(Math.random() * 41) + 10; // MockIDRX: 10-50
+        // Randomly select fragment attributes from daily reward pool
+        const fragmentReward = DAILY_FRAGMENT_REWARDS[Math.floor(Math.random() * DAILY_FRAGMENT_REWARDS.length)];
         // 4. Mint fragment on-chain
-        let txHash;
+        let fragmentTxHash;
         try {
-            txHash = await (0, client_1.mintFragment)(walletAddress, fragmentType, 1);
+            fragmentTxHash = await (0, client_1.mintFragment)(walletAddress, fragmentType, 1);
         }
         catch (error) {
-            console.error("Blockchain mint failed:", error);
+            console.error("Blockchain fragment mint failed:", error);
             res.status(500).json({
                 error: "Failed to mint fragment on blockchain",
             });
             return;
         }
-        // 5. Store fragment record, add coins, and update lastCheckIn in a transaction
-        const updatedUser = await prisma_1.prisma.$transaction(async (tx) => {
+        // 5. Mint MockIDRX tokens on-chain
+        let mockIDRXTxHash;
+        try {
+            mockIDRXTxHash = await (0, client_1.mintMockIDRX)(walletAddress, mockIDRXReward);
+        }
+        catch (error) {
+            console.error("Blockchain MockIDRX mint failed:", error);
+            res.status(500).json({
+                error: "Failed to mint MockIDRX tokens on blockchain",
+                fragmentTxHash, // Fragment was minted successfully
+            });
+            return;
+        }
+        // 6. Store fragment record and update lastCheckIn in a transaction
+        await prisma_1.prisma.$transaction(async (tx) => {
             await tx.fragment.create({
                 data: {
                     userId,
                     typeId: fragmentType,
-                    txHash,
+                    brand: fragmentReward.brand,
+                    series: fragmentReward.series,
+                    rarity: fragmentReward.rarity,
+                    txHash: fragmentTxHash,
                 },
             });
-            return await tx.user.update({
+            await tx.user.update({
                 where: { id: userId },
                 data: {
                     lastCheckIn: now,
-                    coins: { increment: coinsReward }, // Add coins to user balance
                 },
             });
         });
-        // 6. Return success response with all rewards
+        // 7. Get updated MockIDRX balance from blockchain
+        const mockIDRXBalance = await (0, client_1.getMockIDRXBalance)(walletAddress);
+        // 8. Return success response with all rewards
         res.status(200).json({
             success: true,
             rewards: {
                 fragment: {
                     type: fragmentType,
-                    txHash,
+                    txHash: fragmentTxHash,
                 },
-                coins: {
-                    earned: coinsReward,
-                    total: updatedUser.coins,
+                mockIDRX: {
+                    earned: mockIDRXReward,
+                    total: mockIDRXBalance,
+                    txHash: mockIDRXTxHash,
                 },
             },
-            message: `Check-in successful! Earned ${coinsReward} coins and 1 fragment.`,
+            message: `Check-in successful! Earned ${mockIDRXReward} IDRX and 1 fragment.`,
         });
     }
     catch (error) {

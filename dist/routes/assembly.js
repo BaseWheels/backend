@@ -4,16 +4,21 @@ const express_1 = require("express");
 const prisma_1 = require("../lib/prisma");
 const auth_1 = require("../middleware/auth");
 const client_1 = require("../blockchain/client");
-const assembly_1 = require("../config/assembly");
 const router = (0, express_1.Router)();
 /**
  * POST /assembly/forge
- * Assemble 5 fragments into a complete Car NFT
+ * Assemble 5 fragments of a specific brand into a Car NFT
  */
 router.post("/assembly/forge", auth_1.auth, async (req, res) => {
     try {
         const { userId, walletAddress } = req;
-        // 1. Verify user exists
+        const { brand } = req.body;
+        // 1. Validate brand parameter
+        if (!brand || typeof brand !== "string") {
+            res.status(400).json({ error: "Brand is required" });
+            return;
+        }
+        // 2. Verify user exists
         const user = await prisma_1.prisma.user.findUnique({
             where: { id: userId },
         });
@@ -21,27 +26,53 @@ router.post("/assembly/forge", auth_1.auth, async (req, res) => {
             res.status(404).json({ error: "User not found" });
             return;
         }
-        // 2. Check on-chain if user has all 5 fragment types (CRITICAL SECURITY)
-        console.log(`Checking fragments for user ${walletAddress}...`);
-        let hasAllParts;
+        // 3. Check off-chain if user has all 5 fragment types for this brand
+        const userFragments = await prisma_1.prisma.fragment.findMany({
+            where: { userId, brand, isUsed: false },
+        });
+        // Group by typeId and check all 5 types exist
+        const fragmentsByType = {};
+        userFragments.forEach(f => {
+            if (!fragmentsByType[f.typeId])
+                fragmentsByType[f.typeId] = [];
+            fragmentsByType[f.typeId].push({ id: f.id });
+        });
+        const hasAllTypes = [0, 1, 2, 3, 4].every(typeId => (fragmentsByType[typeId]?.length ?? 0) >= 1);
+        if (!hasAllTypes) {
+            const missingTypes = [0, 1, 2, 3, 4].filter(t => !fragmentsByType[t]?.length);
+            const typeNames = ["Chassis", "Wheels", "Engine", "Body", "Interior"];
+            res.status(400).json({
+                error: "Insufficient fragments",
+                message: `Missing fragments for ${brand}: ${missingTypes.map(t => typeNames[t]).join(", ")}`,
+                missingTypes,
+            });
+            return;
+        }
+        // 4. Also verify on-chain (CRITICAL SECURITY)
+        console.log(`Checking on-chain fragments for user ${walletAddress}...`);
+        let hasAllPartsOnChain;
         try {
-            hasAllParts = await (0, client_1.checkAllParts)(walletAddress);
+            hasAllPartsOnChain = await (0, client_1.checkAllParts)(walletAddress);
         }
         catch (error) {
-            console.error("Failed to check fragments:", error);
+            console.error("Failed to check on-chain fragments:", error);
             res.status(500).json({
                 error: "Failed to verify fragments on blockchain",
             });
             return;
         }
-        if (!hasAllParts) {
+        if (!hasAllPartsOnChain) {
             res.status(400).json({
-                error: "Insufficient fragments",
-                message: "You need at least 1 of each fragment type (0-4) to assemble a car",
+                error: "On-chain fragment verification failed",
+                message: "Your on-chain fragment balance doesn't match. Please contact support.",
             });
             return;
         }
-        // 3. Burn fragments on-chain
+        // 5. Get brand details from first fragment
+        const firstFragment = userFragments[0];
+        const carSeries = firstFragment.series;
+        const carRarity = firstFragment.rarity;
+        // 6. Burn fragments on-chain
         console.log(`Burning fragments for user ${walletAddress}...`);
         let burnTxHash;
         try {
@@ -54,10 +85,14 @@ router.post("/assembly/forge", auth_1.auth, async (req, res) => {
             });
             return;
         }
-        // 4. Select random assembled car
-        const assembledCar = (0, assembly_1.selectRandomAssembledCar)();
-        // 5. Mint assembled Car NFT (contract auto-generates tokenId)
-        console.log(`Minting car ${assembledCar.modelName} for user ${walletAddress}...`);
+        // 7. Mark fragments as used in database (one of each type)
+        const fragmentIdsToUse = [0, 1, 2, 3, 4].map(typeId => fragmentsByType[typeId][0].id);
+        await prisma_1.prisma.fragment.updateMany({
+            where: { id: { in: fragmentIdsToUse } },
+            data: { isUsed: true },
+        });
+        // 8. Mint Car NFT (contract auto-generates tokenId)
+        console.log(`Minting car ${brand} for user ${walletAddress}...`);
         let tokenId;
         let mintTxHash;
         try {
@@ -68,8 +103,9 @@ router.post("/assembly/forge", auth_1.auth, async (req, res) => {
         catch (error) {
             console.error("Failed to mint car:", error);
             // CRITICAL: Fragments already burned! Log this for manual recovery
-            console.error(`CRITICAL: User ${walletAddress} burned fragments but mint failed!`);
+            console.error(`CRITICAL: User ${walletAddress} burned fragments for ${brand} but mint failed!`);
             console.error(`Burn TX: ${burnTxHash}`);
+            console.error(`Fragment IDs used: ${fragmentIdsToUse.join(", ")}`);
             res.status(500).json({
                 error: "Failed to mint assembled car on blockchain",
                 burnTxHash,
@@ -77,29 +113,29 @@ router.post("/assembly/forge", auth_1.auth, async (req, res) => {
             });
             return;
         }
-        // 6. Store assembled car in database
+        // 9. Store assembled car in database
         await prisma_1.prisma.car.create({
             data: {
                 tokenId,
                 ownerId: userId,
-                modelName: assembledCar.modelName,
-                series: assembledCar.series,
+                modelName: brand,
+                series: carSeries,
                 mintTxHash,
                 isRedeemed: false,
             },
         });
-        // 7. Return success response
+        // 10. Return success response
         res.status(200).json({
             success: true,
             car: {
                 tokenId,
-                modelName: assembledCar.modelName,
-                series: assembledCar.series,
-                rarity: assembledCar.rarity,
+                modelName: brand,
+                series: carSeries,
+                rarity: carRarity,
                 burnTxHash,
                 mintTxHash,
             },
-            message: `Successfully assembled a ${assembledCar.rarity} ${assembledCar.modelName}!`,
+            message: `Successfully assembled a ${carRarity} ${brand}!`,
         });
     }
     catch (error) {
@@ -111,18 +147,41 @@ router.post("/assembly/forge", auth_1.auth, async (req, res) => {
 });
 /**
  * GET /assembly/can-forge
- * Check if user can forge (has all fragments)
+ * Check which brands user can forge
  */
 router.get("/assembly/can-forge", auth_1.auth, async (req, res) => {
     try {
-        const { walletAddress } = req;
-        // Check on-chain
-        const hasAllParts = await (0, client_1.checkAllParts)(walletAddress);
+        const { userId, walletAddress } = req;
+        // Check off-chain fragments grouped by brand
+        const fragments = await prisma_1.prisma.fragment.findMany({
+            where: { userId, isUsed: false },
+        });
+        // Group by brand
+        const fragmentsByBrand = {};
+        fragments.forEach(f => {
+            if (!fragmentsByBrand[f.brand])
+                fragmentsByBrand[f.brand] = new Set();
+            fragmentsByBrand[f.brand].add(f.typeId);
+        });
+        // Find brands with all 5 types
+        const assemblableBrands = Object.entries(fragmentsByBrand)
+            .filter(([, types]) => types.size === 5)
+            .map(([brand]) => brand);
+        // Also check on-chain
+        let hasAllPartsOnChain = false;
+        try {
+            hasAllPartsOnChain = await (0, client_1.checkAllParts)(walletAddress);
+        }
+        catch (error) {
+            console.error("Failed to check on-chain:", error);
+        }
         res.status(200).json({
-            canForge: hasAllParts,
-            message: hasAllParts
-                ? "You have all fragments needed for assembly!"
-                : "You need 1 of each fragment type (0-4) to assemble",
+            canForge: assemblableBrands.length > 0 && hasAllPartsOnChain,
+            assemblableBrands,
+            hasOnChainFragments: hasAllPartsOnChain,
+            message: assemblableBrands.length > 0
+                ? `You can assemble: ${assemblableBrands.join(", ")}`
+                : "Collect all 5 fragment types of the same brand to assemble",
         });
     }
     catch (error) {
