@@ -7,6 +7,7 @@ import assemblyRoutes from "./routes/assembly";
 import garageRoutes from "./routes/garage";
 import metadataRoutes from "./routes/metadata";
 import marketplaceRoutes from "./routes/marketplace";
+import supplyRoutes from "./routes/supply";
 
 dotenv.config();
 
@@ -28,6 +29,7 @@ app.use("/api", gachaRoutes);
 app.use("/api", assemblyRoutes);
 app.use("/api", garageRoutes);
 app.use("/api", marketplaceRoutes);
+app.use("/api", supplyRoutes);
 
 // Metadata Routes (for NFT marketplaces)
 app.use(metadataRoutes);

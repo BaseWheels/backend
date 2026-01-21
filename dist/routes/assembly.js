@@ -4,6 +4,7 @@ const express_1 = require("express");
 const prisma_1 = require("../lib/prisma");
 const auth_1 = require("../middleware/auth");
 const client_1 = require("../blockchain/client");
+const supply_1 = require("../config/supply");
 const router = (0, express_1.Router)();
 /**
  * POST /assembly/forge
@@ -72,6 +73,43 @@ router.post("/assembly/forge", auth_1.auth, async (req, res) => {
         const firstFragment = userFragments[0];
         const carSeries = firstFragment.series;
         const carRarity = firstFragment.rarity;
+        // 5.5. Prepare fragment IDs for assembly
+        const fragmentIdsToUse = [0, 1, 2, 3, 4].map(typeId => fragmentsByType[typeId][0].id);
+        // 5.6. Check supply cap (RWA management)
+        const currentMinted = await prisma_1.prisma.car.count({
+            where: { series: carSeries },
+        });
+        const supplyStatus = (0, supply_1.getSupplyStatus)(carSeries, currentMinted);
+        if (supplyStatus.soldOut) {
+            // Series is sold out! Offer user 2 options
+            const waitingListPosition = await prisma_1.prisma.waitingList.count({
+                where: { series: carSeries, status: "waiting" },
+            });
+            res.status(409).json({
+                error: "Series sold out",
+                soldOut: true,
+                series: carSeries,
+                fragmentIds: fragmentIdsToUse,
+                supplyStatus,
+                options: [
+                    {
+                        type: "refund",
+                        title: "Get MockIDRX Bonus",
+                        description: `Exchange your fragments for ${supply_1.SERIES_REFUND_BONUS[carSeries]?.toLocaleString()} IDRX bonus`,
+                        bonus: supply_1.SERIES_REFUND_BONUS[carSeries] || 0,
+                    },
+                    {
+                        type: "waitlist",
+                        title: "Join Waiting List",
+                        description: "Keep your fragments and wait for restock notification",
+                        currentPosition: waitingListPosition + 1,
+                        estimatedWait: "30-60 days",
+                    },
+                ],
+                message: `${carSeries} series is sold out (${currentMinted}/${supplyStatus.maxSupply}). Choose an option to proceed.`,
+            });
+            return;
+        }
         // 6. Burn fragments on-chain
         console.log(`Burning fragments for user ${walletAddress}...`);
         let burnTxHash;
@@ -86,7 +124,6 @@ router.post("/assembly/forge", auth_1.auth, async (req, res) => {
             return;
         }
         // 7. Mark fragments as used in database (one of each type)
-        const fragmentIdsToUse = [0, 1, 2, 3, 4].map(typeId => fragmentsByType[typeId][0].id);
         await prisma_1.prisma.fragment.updateMany({
             where: { id: { in: fragmentIdsToUse } },
             data: { isUsed: true },
