@@ -47,7 +47,7 @@ export interface FragmentReward extends BaseReward {
 export type GachaReward = CarReward | FragmentReward;
 
 export interface GachaBox {
-  type: "standard" | "premium" | "legendary";
+  type: "standard" | "rare" | "premium" | "legendary";
   costCoins: number;
   rewards: GachaReward[];
 }
@@ -76,6 +76,27 @@ export const GACHA_BOXES: Record<string, GachaBox> = {
       { rewardType: "car", rarity: "common", modelName: "Honda Civic", series: "Economy", probability: 5 },
       { rewardType: "car", rarity: "common", modelName: "Toyota Corolla", series: "Economy", probability: 5 },
       { rewardType: "car", rarity: "rare", modelName: "BMW M3", series: "Sport", probability: 5 },
+    ],
+  },
+  rare: {
+    type: "rare",
+    costCoins: 30000,
+    rewards: [
+      // BMW M3 Fragments (Sport)
+      { rewardType: "fragment", rarity: "rare", fragmentType: FRAGMENT_TYPES.CHASSIS, amount: 1, probability: 10, brand: "BMW M3", series: "Sport" },
+      { rewardType: "fragment", rarity: "rare", fragmentType: FRAGMENT_TYPES.WHEELS, amount: 1, probability: 10, brand: "BMW M3", series: "Sport" },
+      { rewardType: "fragment", rarity: "rare", fragmentType: FRAGMENT_TYPES.BODY, amount: 1, probability: 8, brand: "BMW M3", series: "Sport" },
+      { rewardType: "fragment", rarity: "rare", fragmentType: FRAGMENT_TYPES.ENGINE, amount: 1, probability: 8, brand: "BMW M3", series: "Sport" },
+      { rewardType: "fragment", rarity: "rare", fragmentType: FRAGMENT_TYPES.INTERIOR, amount: 1, probability: 6, brand: "BMW M3", series: "Sport" },
+      // Audi RS6 Fragments (Sport)
+      { rewardType: "fragment", rarity: "rare", fragmentType: FRAGMENT_TYPES.CHASSIS, amount: 1, probability: 6, brand: "Audi RS6", series: "Sport" },
+      { rewardType: "fragment", rarity: "rare", fragmentType: FRAGMENT_TYPES.WHEELS, amount: 1, probability: 6, brand: "Audi RS6", series: "Sport" },
+      { rewardType: "fragment", rarity: "rare", fragmentType: FRAGMENT_TYPES.BODY, amount: 1, probability: 4, brand: "Audi RS6", series: "Sport" },
+      // Cars (42% total)
+      { rewardType: "car", rarity: "rare", modelName: "BMW M3", series: "Sport", probability: 15 },
+      { rewardType: "car", rarity: "rare", modelName: "Audi RS6", series: "Sport", probability: 12 },
+      { rewardType: "car", rarity: "rare", modelName: "Mercedes AMG GT", series: "Sport", probability: 10 },
+      { rewardType: "car", rarity: "epic", modelName: "Porsche 911 Turbo", series: "Supercar", probability: 5 },
     ],
   },
   premium: {
