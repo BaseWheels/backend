@@ -29,7 +29,7 @@ export interface FragmentReward extends BaseReward {
 }
 export type GachaReward = CarReward | FragmentReward;
 export interface GachaBox {
-    type: "standard" | "premium" | "legendary";
+    type: "standard" | "rare" | "premium" | "legendary";
     costCoins: number;
     rewards: GachaReward[];
 }

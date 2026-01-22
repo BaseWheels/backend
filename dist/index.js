@@ -13,6 +13,7 @@ const garage_1 = __importDefault(require("./routes/garage"));
 const metadata_1 = __importDefault(require("./routes/metadata"));
 const marketplace_1 = __importDefault(require("./routes/marketplace"));
 const supply_1 = __importDefault(require("./routes/supply"));
+const activity_1 = __importDefault(require("./routes/activity"));
 dotenv_1.default.config();
 const app = (0, express_1.default)();
 const PORT = process.env.PORT || 3000;
@@ -30,6 +31,7 @@ app.use("/api", assembly_1.default);
 app.use("/api", garage_1.default);
 app.use("/api", marketplace_1.default);
 app.use("/api", supply_1.default);
+app.use("/api", activity_1.default);
 // Metadata Routes (for NFT marketplaces)
 app.use(metadata_1.default);
 // Start server

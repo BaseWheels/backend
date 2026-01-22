@@ -36,14 +36,18 @@ model Fragment {
 }
 
 model Car {
-  tokenId     Int      @id
+  tokenId     Int       @id
   ownerId     String
   modelName   String?
   series      String?
-  isRedeemed  Boolean  @default(false)
+  isRedeemed  Boolean   @default(false)
   mintTxHash  String?
-  user        User     @relation(fields: [ownerId], references: [id])
+  createdAt   DateTime  @default(now())
+  redeemedAt  DateTime?
+  user        User      @relation(fields: [ownerId], references: [id])
   listing     Listing?
+
+  @@index([createdAt])
 }
 
 model Listing {
