@@ -18,6 +18,8 @@ router.get("/activity/recent", auth_1.auth, async (_req, res) => {
                 user: {
                     select: {
                         walletAddress: true,
+                        username: true,
+                        email: true,
                     }
                 }
             }
@@ -31,33 +33,47 @@ router.get("/activity/recent", auth_1.auth, async (_req, res) => {
                 user: {
                     select: {
                         walletAddress: true,
+                        username: true,
+                        email: true,
                     }
                 }
             }
         });
         // Transform to activity format
-        const mintActivities = recentMints.map(car => ({
-            id: `mint-${car.tokenId}`,
-            type: 'mint',
-            user: `${car.user.walletAddress.slice(0, 6)}...${car.user.walletAddress.slice(-4)}`,
-            action: `minted ${car.series || 'a'} NFT`,
-            carModel: car.modelName,
-            series: car.series,
-            timestamp: car.createdAt,
-            avatar: getSeriesEmoji(car.series),
-        }));
+        const mintActivities = recentMints.map(car => {
+            // Use username/email if available, otherwise wallet address
+            const displayName = car.user.username ||
+                car.user.email ||
+                `${car.user.walletAddress.slice(0, 6)}...${car.user.walletAddress.slice(-4)}`;
+            return {
+                id: `mint-${car.tokenId}`,
+                type: 'mint',
+                user: displayName,
+                action: `minted ${car.series || 'a'} NFT`,
+                carModel: car.modelName,
+                series: car.series,
+                timestamp: car.createdAt,
+                avatar: getSeriesEmoji(car.series),
+            };
+        });
         const redeemActivities = recentRedeems
             .filter(car => car.redeemedAt) // Only include cars with redeemedAt
-            .map(car => ({
-            id: `redeem-${car.tokenId}`,
-            type: 'redeem',
-            user: `${car.user.walletAddress.slice(0, 6)}...${car.user.walletAddress.slice(-4)}`,
-            action: `claimed physical ${car.series || ''} car`,
-            carModel: car.modelName,
-            series: car.series,
-            timestamp: car.redeemedAt,
-            avatar: '🔥',
-        }));
+            .map(car => {
+            // Use username/email if available, otherwise wallet address
+            const displayName = car.user.username ||
+                car.user.email ||
+                `${car.user.walletAddress.slice(0, 6)}...${car.user.walletAddress.slice(-4)}`;
+            return {
+                id: `redeem-${car.tokenId}`,
+                type: 'redeem',
+                user: displayName,
+                action: `claimed physical ${car.series || ''} car`,
+                carModel: car.modelName,
+                series: car.series,
+                timestamp: car.redeemedAt,
+                avatar: '🔥',
+            };
+        });
         // Combine and sort by timestamp
         const allActivities = [...mintActivities, ...redeemActivities]
             .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())

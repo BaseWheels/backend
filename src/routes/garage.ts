@@ -74,6 +74,9 @@ router.get("/garage/overview", auth, async (req: Request, res: Response) => {
       user: {
         id: user.id,
         walletAddress: user.walletAddress,
+        email: user.email,
+        username: user.username,
+        usernameSet: user.usernameSet,
         mockIDRX: mockIDRXBalance,
         lastCheckIn: user.lastCheckIn,
         createdAt: user.createdAt,

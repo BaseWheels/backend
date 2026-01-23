@@ -23,15 +23,39 @@ async function auth(req, res, next) {
             res.status(400).json({ error: "User has no linked wallet" });
             return;
         }
+        // Extract email and username from Privy user
+        const email = user.email?.address || null;
+        let username = null;
+        // Priority: Twitter > Discord > Email username
+        if (user.twitter?.username) {
+            username = user.twitter.username || null;
+        }
+        else if (user.discord?.username) {
+            username = user.discord.username || null;
+        }
+        else if (email) {
+            username = email.split('@')[0] || null;
+        }
+        // Check if user already exists
+        const existingUser = await prisma_1.prisma.user.findUnique({
+            where: { id: claims.userId },
+            select: { usernameSet: true, username: true },
+        });
         // Auto-create user in database if doesn't exist (just-in-time provisioning)
+        // Only update username if it hasn't been manually set by user
         await prisma_1.prisma.user.upsert({
             where: { id: claims.userId },
             update: {
                 walletAddress: walletAddress.toLowerCase(),
+                email,
+                // Only update username if user hasn't manually set it
+                ...(existingUser?.usernameSet ? {} : { username }),
             },
             create: {
                 id: claims.userId,
                 walletAddress: walletAddress.toLowerCase(),
+                email,
+                username,
                 coins: 0, // Starting coins
             },
         });

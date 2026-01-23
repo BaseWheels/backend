@@ -10,9 +10,18 @@ datasource db {
 model User {
   id              String        @id
   walletAddress   String        @unique
+  email           String?       // User email from Privy
+  username        String?       // Username from Twitter/Discord/Email
+  usernameSet     Boolean       @default(false) // Track if user manually set username (one-time only)
   coins           Int           @default(0)
   lastCheckIn     DateTime      @default(now())
   createdAt       DateTime      @default(now())
+
+  // Shipping information for physical redemption
+  shippingName    String?
+  shippingPhone   String?
+  shippingAddress String?
+
   fragments       Fragment[]
   cars            Car[]
   sellerListings  Listing[]     @relation("SellerListings")
