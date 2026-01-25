@@ -1,7 +1,8 @@
 {
-  "name": "backends",
+  "name": "minigarage-backend",
   "version": "1.0.0",
-  "main": "index.js",
+  "description": "MiniGarage - Your personal digital garage. Collect legendary racing machines as NFTs on Base blockchain.",
+  "main": "dist/index.js",
   "scripts": {
     "dev": "ts-node-dev --respawn src/index.ts",
     "build": "tsc",
@@ -10,10 +11,18 @@
     "migrate:deploy": "prisma migrate deploy",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "description": "",
+  "keywords": [
+    "web3",
+    "nft",
+    "blockchain",
+    "base",
+    "gacha",
+    "gaming",
+    "collectibles",
+    "cars"
+  ],
+  "author": "MiniGarage Team",
+  "license": "MIT",
   "dependencies": {
     "@prisma/client": "^5.22.0",
     "@privy-io/server-auth": "^1.32.5",
@@ -27,7 +36,6 @@
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
     "@types/node": "^22.10.5",
-    "better-sqlite3": "^12.5.0",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.9.3"
   }
