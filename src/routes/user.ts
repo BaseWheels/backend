@@ -39,6 +39,93 @@ router.get("/user/profile", auth, async (req: Request, res: Response) => {
 });
 
 /**
+ * PUT /api/user/profile
+ * Update user profile (shipping information)
+ */
+router.put("/user/profile", auth, async (req: Request, res: Response) => {
+  try {
+    const { userId } = req as AuthRequest;
+    const { shippingName, shippingPhone, shippingAddress } = req.body;
+
+    // Validate shipping information
+    if (!shippingName || typeof shippingName !== "string") {
+      res.status(400).json({ error: "Full name is required" });
+      return;
+    }
+
+    if (!shippingPhone || typeof shippingPhone !== "string") {
+      res.status(400).json({ error: "Phone number is required" });
+      return;
+    }
+
+    if (!shippingAddress || typeof shippingAddress !== "string") {
+      res.status(400).json({ error: "Delivery address is required" });
+      return;
+    }
+
+    // Trim inputs
+    const trimmedName = shippingName.trim();
+    const trimmedPhone = shippingPhone.trim();
+    const trimmedAddress = shippingAddress.trim();
+
+    // Validate lengths
+    if (trimmedName.length < 2) {
+      res.status(400).json({ error: "Full name must be at least 2 characters" });
+      return;
+    }
+
+    if (trimmedName.length > 100) {
+      res.status(400).json({ error: "Full name must be at most 100 characters" });
+      return;
+    }
+
+    if (trimmedPhone.length < 8) {
+      res.status(400).json({ error: "Phone number must be at least 8 characters" });
+      return;
+    }
+
+    if (trimmedPhone.length > 20) {
+      res.status(400).json({ error: "Phone number must be at most 20 characters" });
+      return;
+    }
+
+    if (trimmedAddress.length < 10) {
+      res.status(400).json({ error: "Delivery address must be at least 10 characters" });
+      return;
+    }
+
+    if (trimmedAddress.length > 500) {
+      res.status(400).json({ error: "Delivery address must be at most 500 characters" });
+      return;
+    }
+
+    // Update user shipping info
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        shippingName: trimmedName,
+        shippingPhone: trimmedPhone,
+        shippingAddress: trimmedAddress,
+      },
+      select: {
+        id: true,
+        shippingName: true,
+        shippingPhone: true,
+        shippingAddress: true,
+      },
+    });
+
+    res.json({
+      message: "Shipping information updated successfully",
+      user: updatedUser,
+    });
+  } catch (error) {
+    console.error("Update profile error:", error);
+    res.status(500).json({ error: "Failed to update shipping information" });
+  }
+});
+
+/**
  * POST /api/user/set-username
  * Set username (one-time only, on first login)
  */

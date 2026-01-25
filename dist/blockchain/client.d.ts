@@ -49,7 +49,15 @@ export declare function getMockIDRXBalance(userAddress: string): Promise<number>
  */
 export declare function mintMockIDRX(toAddress: string, amount: number): Promise<string>;
 /**
- * Verify a burn transaction on-chain
+ * Verify a transfer transaction to treasury wallet
+ * @param txHash - Transaction hash to verify
+ * @param expectedSender - Expected address that sent tokens
+ * @param expectedAmount - Expected amount transferred (in token units)
+ * @returns True if transfer is valid
+ */
+export declare function verifyTransferTransaction(txHash: string, expectedSender: string, expectedAmount: number): Promise<boolean>;
+/**
+ * Verify a burn transaction on-chain (DEPRECATED - use verifyTransferTransaction instead)
  * @param txHash - Transaction hash to verify
  * @param expectedBurner - Expected address that burned tokens
  * @param expectedAmount - Expected amount burned (in token units)

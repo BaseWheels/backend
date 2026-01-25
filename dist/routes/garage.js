@@ -50,8 +50,9 @@ router.get("/garage/overview", auth_1.auth, async (req, res) => {
             "Body",
             "Electronics"
         ];
-        // Calculate rarity distribution
-        const rarityCount = user.cars.reduce((acc, car) => {
+        // Calculate rarity distribution (exclude redeemed cars)
+        const activeCars = user.cars.filter(car => !car.isRedeemed);
+        const rarityCount = activeCars.reduce((acc, car) => {
             let rarity = "common";
             if (car.series?.includes("Hypercar") || car.series?.includes("Limited Edition")) {
                 rarity = "legendary";
@@ -76,9 +77,12 @@ router.get("/garage/overview", auth_1.auth, async (req, res) => {
                 mockIDRX: mockIDRXBalance,
                 lastCheckIn: user.lastCheckIn,
                 createdAt: user.createdAt,
+                shippingName: user.shippingName,
+                shippingPhone: user.shippingPhone,
+                shippingAddress: user.shippingAddress,
             },
             stats: {
-                totalCars: user.cars.length,
+                totalCars: activeCars.length,
                 totalFragments: user.fragments.length,
                 fragmentsByType: Array.from({ length: 5 }, (_, i) => ({
                     typeId: i,
@@ -89,7 +93,7 @@ router.get("/garage/overview", auth_1.auth, async (req, res) => {
                     Object.values(fragmentCounts).every(count => count >= 1),
                 rarityDistribution: rarityCount,
             },
-            recentCars: user.cars.slice(0, 5).map(car => ({
+            recentCars: activeCars.slice(0, 5).map(car => ({
                 tokenId: car.tokenId,
                 modelName: car.modelName,
                 series: car.series,
@@ -122,13 +126,19 @@ router.get("/garage/cars", auth_1.auth, async (req, res) => {
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 20;
         const skip = (page - 1) * limit;
-        // Get total count
+        // Get total count (only unredeemed cars)
         const totalCars = await prisma_1.prisma.car.count({
-            where: { ownerId: userId },
+            where: {
+                ownerId: userId,
+                isRedeemed: false // Only count unredeemed cars
+            },
         });
-        // Get paginated cars
+        // Get paginated cars (only unredeemed cars)
         const cars = await prisma_1.prisma.car.findMany({
-            where: { ownerId: userId },
+            where: {
+                ownerId: userId,
+                isRedeemed: false // Only show unredeemed cars
+            },
             orderBy: { tokenId: 'desc' },
             skip,
             take: limit,

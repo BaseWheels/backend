@@ -1,7 +1,7 @@
 import { Router, Request, Response } from "express";
 import { prisma } from "../lib/prisma";
 import { auth, AuthRequest } from "../middleware/auth";
-import { mintCar, mintFragment, getMockIDRXBalance, verifyBurnTransaction } from "../blockchain/client";
+import { mintCar, mintFragment, getMockIDRXBalance, verifyTransferTransaction, verifyBurnTransaction } from "../blockchain/client";
 import { GACHA_BOXES, selectRandomReward, FRAGMENT_NAMES, CarReward, FragmentReward } from "../config/gacha";
 
 const router = Router();
@@ -13,7 +13,7 @@ const router = Router();
 router.post("/gacha/open", auth, async (req: Request, res: Response) => {
   try {
     const { userId, walletAddress } = req as AuthRequest;
-    const { boxType, burnTxHash } = req.body;
+    const { boxType, paymentTxHash } = req.body;
 
     // 1. Validate box type
     if (!boxType || !GACHA_BOXES[boxType]) {
@@ -24,34 +24,52 @@ router.post("/gacha/open", auth, async (req: Request, res: Response) => {
       return;
     }
 
-    // 2. Validate burn transaction hash
-    if (!burnTxHash || typeof burnTxHash !== "string") {
+    // 2. Validate payment transaction hash
+    if (!paymentTxHash || typeof paymentTxHash !== "string") {
       res.status(400).json({
-        error: "Burn transaction hash is required",
+        error: "Payment transaction hash is required",
       });
       return;
     }
 
     const gachaBox = GACHA_BOXES[boxType];
 
-    // 3. Verify burn transaction on-chain
+    // 3. Verify payment transaction on-chain (transfer to treasury OR burn)
     try {
-      const isValid = await verifyBurnTransaction(
-        burnTxHash,
-        walletAddress,
-        gachaBox.costCoins
-      );
+      let isValid = false;
+
+      // Try transfer verification first (new gasless method)
+      try {
+        isValid = await verifyTransferTransaction(
+          paymentTxHash,
+          walletAddress,
+          gachaBox.costCoins
+        );
+      } catch (transferError) {
+        console.log("Transfer verification failed, trying burn verification...");
+
+        // Fallback to burn verification (backward compatibility)
+        try {
+          isValid = await verifyBurnTransaction(
+            paymentTxHash,
+            walletAddress,
+            gachaBox.costCoins
+          );
+        } catch (burnError) {
+          throw transferError; // Throw original transfer error
+        }
+      }
 
       if (!isValid) {
         res.status(400).json({
-          error: "Invalid burn transaction",
+          error: "Invalid payment transaction",
         });
         return;
       }
     } catch (error) {
-      console.error("Failed to verify burn transaction:", error);
+      console.error("Failed to verify payment transaction:", error);
       res.status(400).json({
-        error: error instanceof Error ? error.message : "Failed to verify burn transaction",
+        error: error instanceof Error ? error.message : "Failed to verify payment transaction",
       });
       return;
     }
@@ -73,12 +91,12 @@ router.post("/gacha/open", auth, async (req: Request, res: Response) => {
         txHash = result.txHash;
       } catch (error) {
         console.error("Blockchain mint failed:", error);
-        console.error(`CRITICAL: User ${walletAddress} burned ${gachaBox.costCoins} IDRX but mint failed!`);
-        console.error(`Burn TX: ${burnTxHash}`);
+        console.error(`CRITICAL: User ${walletAddress} paid ${gachaBox.costCoins} IDRX but mint failed!`);
+        console.error(`Payment TX: ${paymentTxHash}`);
         res.status(500).json({
           error: "Failed to mint Car NFT on blockchain",
-          burnTxHash,
-          message: "MockIDRX was burned but car minting failed. Contact support.",
+          paymentTxHash,
+          message: "MockIDRX was paid but car minting failed. Contact support.",
         });
         return;
       }
@@ -109,12 +127,12 @@ router.post("/gacha/open", auth, async (req: Request, res: Response) => {
         txHash = await mintFragment(walletAddress, fragmentReward.fragmentType, fragmentReward.amount);
       } catch (error) {
         console.error("Blockchain mint failed:", error);
-        console.error(`CRITICAL: User ${walletAddress} burned ${gachaBox.costCoins} IDRX but fragment mint failed!`);
-        console.error(`Burn TX: ${burnTxHash}`);
+        console.error(`CRITICAL: User ${walletAddress} paid ${gachaBox.costCoins} IDRX but fragment mint failed!`);
+        console.error(`Payment TX: ${paymentTxHash}`);
         res.status(500).json({
           error: "Failed to mint Fragment on blockchain",
-          burnTxHash,
-          message: "MockIDRX was burned but fragment minting failed. Contact support.",
+          paymentTxHash,
+          message: "MockIDRX was paid but fragment minting failed. Contact support.",
         });
         return;
       }
@@ -162,7 +180,7 @@ router.post("/gacha/open", auth, async (req: Request, res: Response) => {
       mockIDRX: {
         spent: gachaBox.costCoins,
         remaining: updatedBalance,
-        burnTxHash,
+        paymentTxHash,
       },
       message,
     });

@@ -1,6 +1,6 @@
 import { Router, Request, Response } from "express";
 import { prisma } from "../lib/prisma";
-import { auth } from "../middleware/auth";
+import { auth, AuthRequest } from "../middleware/auth";
 
 const router = Router();
 
@@ -102,6 +102,172 @@ router.get("/activity/recent", auth, async (_req: Request, res: Response) => {
     });
   }
 });
+
+/**
+ * GET /api/activity/history
+ * Get user-specific transaction history (mints, redeems, marketplace)
+ */
+router.get("/activity/history", auth, async (req: Request, res: Response) => {
+  try {
+    const { userId } = req as AuthRequest;
+
+    // Fetch user's minted cars (gacha wins)
+    const userMints = await prisma.car.findMany({
+      where: { ownerId: userId },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    });
+
+    // Fetch user's redeemed cars
+    const userRedeems = await prisma.car.findMany({
+      where: {
+        ownerId: userId,
+        isRedeemed: true
+      },
+      orderBy: { redeemedAt: 'desc' },
+      take: 50,
+    });
+
+    // Fetch marketplace listings created by user (sold by user)
+    const userListings = await prisma.listing.findMany({
+      where: { sellerId: userId },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+      include: {
+        car: true
+      }
+    });
+
+    // Fetch marketplace purchases by user (bought by user)
+    const userPurchases = await prisma.listing.findMany({
+      where: {
+        buyerId: userId,
+        status: 'sold'
+      },
+      orderBy: { soldAt: 'desc' },
+      take: 50,
+      include: {
+        car: true
+      }
+    });
+
+    // Transform to activity format
+    const activities: any[] = [];
+
+    // Mint activities (Gacha wins)
+    userMints.forEach(car => {
+      activities.push({
+        id: `mint-${car.tokenId}`,
+        type: 'gacha',
+        action: 'Won from Gacha',
+        carModel: car.modelName,
+        series: car.series,
+        rarity: determineRarity(car.series),
+        tokenId: car.tokenId,
+        txHash: car.mintTxHash,
+        timestamp: car.createdAt,
+        icon: '🎰',
+      });
+    });
+
+    // Redeem activities
+    userRedeems.forEach(car => {
+      if (car.redeemedAt) {
+        activities.push({
+          id: `redeem-${car.tokenId}`,
+          type: 'redeem',
+          action: 'Claimed Physical Car',
+          carModel: car.modelName,
+          series: car.series,
+          rarity: determineRarity(car.series),
+          tokenId: car.tokenId,
+          timestamp: car.redeemedAt,
+          icon: '📦',
+        });
+      }
+    });
+
+    // Marketplace listing activities (selling)
+    userListings.forEach((listing: any) => {
+      const isSold = listing.status === 'sold';
+      activities.push({
+        id: `list-${listing.id}`,
+        type: isSold ? 'sold' : 'listed',
+        action: isSold ? 'Sold on Marketplace' : 'Listed on Marketplace',
+        carModel: listing.car.modelName,
+        series: listing.car.series,
+        rarity: determineRarity(listing.car.series),
+        tokenId: listing.car.tokenId,
+        price: listing.price,
+        timestamp: isSold && listing.soldAt ? listing.soldAt : listing.createdAt,
+        icon: isSold ? '💰' : '🏷️',
+      });
+    });
+
+    // Marketplace purchase activities (buying)
+    userPurchases.forEach((listing: any) => {
+      activities.push({
+        id: `buy-${listing.id}`,
+        type: 'purchased',
+        action: 'Purchased from Marketplace',
+        carModel: listing.car.modelName,
+        series: listing.car.series,
+        rarity: determineRarity(listing.car.series),
+        tokenId: listing.car.tokenId,
+        price: listing.price,
+        timestamp: listing.soldAt || listing.updatedAt,
+        icon: '🛒',
+      });
+    });
+
+    // Sort all activities by timestamp
+    const sortedActivities = activities
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      .slice(0, 50); // Limit to 50 most recent
+
+    // Format timestamps
+    const formattedActivities = sortedActivities.map(activity => ({
+      ...activity,
+      time: getRelativeTime(new Date(activity.timestamp)),
+      date: new Date(activity.timestamp).toLocaleDateString(),
+    }));
+
+    res.json({
+      activities: formattedActivities,
+      total: formattedActivities.length,
+      summary: {
+        totalMints: userMints.length,
+        totalRedeems: userRedeems.length,
+        totalListings: userListings.length,
+        totalSales: userListings.filter((l: any) => l.status === 'sold').length,
+        totalPurchases: userPurchases.length,
+      }
+    });
+  } catch (error) {
+    console.error("User activity history error:", error);
+    res.status(500).json({
+      error: "Failed to fetch activity history",
+    });
+  }
+});
+
+/**
+ * Helper: Determine rarity from series
+ */
+function determineRarity(series: string | null): string {
+  if (!series) return 'common';
+
+  if (series.includes('Hypercar') || series.includes('Limited Edition')) {
+    return 'legendary';
+  } else if (series.includes('German Engineering') || series.includes('Supercar')) {
+    return 'epic';
+  } else if (series.includes('JDM Legend') || series.includes('Sport')) {
+    return 'rare';
+  } else if (series.includes('Uncommon')) {
+    return 'uncommon';
+  }
+  return 'common';
+}
 
 /**
  * Helper: Get emoji based on series

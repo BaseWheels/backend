@@ -100,6 +100,7 @@ router.post("/marketplace/list", auth, async (req: Request, res: Response) => {
           select: {
             id: true,
             walletAddress: true,
+            username: true,
           },
         },
       },
@@ -174,6 +175,7 @@ router.get("/marketplace/listings", auth, async (req: Request, res: Response) =>
             select: {
               id: true,
               walletAddress: true,
+              username: true,
             },
           },
         },
@@ -516,10 +518,18 @@ router.get("/marketplace/my-listings", auth, async (req: Request, res: Response)
       where,
       include: {
         car: true,
+        seller: {
+          select: {
+            id: true,
+            walletAddress: true,
+            username: true,
+          },
+        },
         buyer: {
           select: {
             id: true,
             walletAddress: true,
+            username: true,
           },
         },
       },
@@ -572,6 +582,7 @@ router.get("/marketplace/listing/:listingId", auth, async (req: Request, res: Re
           select: {
             id: true,
             walletAddress: true,
+            username: true,
             createdAt: true,
           },
         },
@@ -579,6 +590,7 @@ router.get("/marketplace/listing/:listingId", auth, async (req: Request, res: Re
           select: {
             id: true,
             walletAddress: true,
+            username: true,
           },
         },
       },

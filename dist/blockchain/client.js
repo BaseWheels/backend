@@ -7,6 +7,7 @@ exports.checkAllParts = checkAllParts;
 exports.burnForAssembly = burnForAssembly;
 exports.getMockIDRXBalance = getMockIDRXBalance;
 exports.mintMockIDRX = mintMockIDRX;
+exports.verifyTransferTransaction = verifyTransferTransaction;
 exports.verifyBurnTransaction = verifyBurnTransaction;
 exports.burnMockIDRX = burnMockIDRX;
 const ethers_1 = require("ethers");
@@ -163,7 +164,75 @@ async function mintMockIDRX(toAddress, amount) {
     }
 }
 /**
- * Verify a burn transaction on-chain
+ * Verify a transfer transaction to treasury wallet
+ * @param txHash - Transaction hash to verify
+ * @param expectedSender - Expected address that sent tokens
+ * @param expectedAmount - Expected amount transferred (in token units)
+ * @returns True if transfer is valid
+ */
+async function verifyTransferTransaction(txHash, expectedSender, expectedAmount) {
+    try {
+        // Get transaction receipt
+        const receipt = await exports.provider.getTransactionReceipt(txHash);
+        if (!receipt) {
+            throw new Error("Transaction not found");
+        }
+        if (!receipt.status) {
+            throw new Error("Transaction failed");
+        }
+        // Check if transaction is to MockIDRX contract
+        if (receipt.to?.toLowerCase() !== config_1.MOCKIDRX_CONTRACT_ADDRESS.toLowerCase()) {
+            throw new Error("Transaction not to MockIDRX contract");
+        }
+        // Get treasury wallet address from contract
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const treasuryWallet = await exports.mockIDRXContract.treasuryWallet();
+        // Parse logs for Transfer or SpinPayment event
+        const iface = exports.mockIDRXContract.interface;
+        const decimals = await exports.mockIDRXContract.decimals();
+        const expectedAmountInWei = ethers_1.ethers.parseUnits(expectedAmount.toString(), decimals);
+        for (const log of receipt.logs) {
+            try {
+                const parsed = iface.parseLog({ topics: log.topics, data: log.data });
+                // Check for SpinPayment event (preferred)
+                if (parsed && parsed.name === "SpinPayment") {
+                    const user = parsed.args[0];
+                    const cost = parsed.args[1];
+                    const treasury = parsed.args[2];
+                    // Verify sender, amount, and treasury
+                    if (user.toLowerCase() === expectedSender.toLowerCase() &&
+                        cost >= expectedAmountInWei &&
+                        treasury.toLowerCase() === treasuryWallet.toLowerCase()) {
+                        return true;
+                    }
+                }
+                // Also check for Transfer event as fallback
+                if (parsed && parsed.name === "Transfer") {
+                    const from = parsed.args[0];
+                    const to = parsed.args[1];
+                    const value = parsed.args[2];
+                    // Verify sender, receiver (treasury), and amount
+                    if (from.toLowerCase() === expectedSender.toLowerCase() &&
+                        to.toLowerCase() === treasuryWallet.toLowerCase() &&
+                        value >= expectedAmountInWei) {
+                        return true;
+                    }
+                }
+            }
+            catch {
+                // Skip logs that don't match
+                continue;
+            }
+        }
+        throw new Error("No valid SpinPayment or Transfer event found in transaction");
+    }
+    catch (error) {
+        console.error("Verify transfer transaction error:", error);
+        throw new Error(`Failed to verify transfer transaction: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+}
+/**
+ * Verify a burn transaction on-chain (DEPRECATED - use verifyTransferTransaction instead)
  * @param txHash - Transaction hash to verify
  * @param expectedBurner - Expected address that burned tokens
  * @param expectedAmount - Expected amount burned (in token units)
