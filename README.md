@@ -1,6 +1,6 @@
-# NFT Car Gacha Game - Backend API
+# MiniGarage - Backend API
 
-> A Web3-powered car collecting game with gacha mechanics, NFT marketplace, and blockchain integration on Base Sepolia testnet.
+> **MiniGarage** - Your personal digital garage. Collect legendary racing machines as NFTs on Base blockchain.
 
 ## Table of Contents
 
@@ -19,14 +19,16 @@
 
 ## Overview
 
-This is the backend service for an NFT-based car collecting game where users can:
-- Open gacha boxes to collect car fragments (ERC1155 NFTs)
-- Assemble fragments into complete cars (ERC721 NFTs)
-- Trade cars on the marketplace
-- Earn daily rewards through check-ins
-- Redeem physical car models with their NFTs
+**MiniGarage** is a Web3-powered car collecting game that brings the thrill of owning legendary racing machines to the blockchain. Build your dream garage by collecting, assembling, and trading NFT cars on Base network.
 
-Built with Express.js, Prisma ORM, and ethers.js for seamless Web3 integration.
+**What you can do:**
+- 🎰 Open gacha boxes to collect rare car fragments (ERC1155 NFTs)
+- 🔧 Assemble fragments into complete racing machines (ERC721 NFTs)
+- 🏪 Trade cars on the decentralized marketplace
+- 🎁 Earn daily rewards through check-ins
+- 🚗 Redeem physical die-cast models with your NFTs
+
+Built with Express.js, Prisma ORM, and ethers.js for seamless Web3 integration on Base Sepolia testnet.
 
 ---
 
@@ -498,7 +500,7 @@ backend/
 
 ## Contributing
 
-This is a hackathon project. Contributions, issues, and feature requests are welcome!
+**MiniGarage** is a Base Hackathon project. Contributions, issues, and feature requests are welcome!
 
 ---
 
@@ -510,11 +512,10 @@ MIT License - feel free to use this project for learning and development.
 
 ## Team
 
-Built with ❤️ for [Hackathon Name]
+Built with ❤️ for [Base Hackathon]
 
-- [Team Member 1] - Role
-- [Team Member 2] - Role
-- [Team Member 3] - Role
+- [Diva] - Smartcontract + FE + BE
+- [Imaneul] - BE + FE
 
 ---
 
