@@ -16,6 +16,7 @@ const supply_1 = __importDefault(require("./routes/supply"));
 const activity_1 = __importDefault(require("./routes/activity"));
 const redeem_1 = __importDefault(require("./routes/redeem"));
 const user_1 = __importDefault(require("./routes/user"));
+const gasless_1 = __importDefault(require("./routes/gasless"));
 dotenv_1.default.config();
 const app = (0, express_1.default)();
 const PORT = process.env.PORT || 3000;
@@ -36,6 +37,7 @@ app.use("/api", supply_1.default);
 app.use("/api", activity_1.default);
 app.use("/api", redeem_1.default);
 app.use("/api", user_1.default);
+app.use("/api", gasless_1.default); // 🔥 Gasless transaction relay
 // Metadata Routes (for NFT marketplaces)
 app.use(metadata_1.default);
 // Start server

@@ -112,7 +112,13 @@ router.put("/user/profile", auth_1.auth, async (req, res) => {
 });
 /**
  * POST /api/user/set-username
- * Set username (one-time only, on first login)
+ * Set username (one-time only, REQUIRED after first login)
+ *
+ * IMPORTANT: This is a one-time operation that cannot be undone.
+ * - User MUST set username after first login (enforced in frontend)
+ * - Username can only contain alphanumeric characters and underscores
+ * - Once set (usernameSet = true), it cannot be changed
+ * - This prevents username from being overridden by Privy auth updates
  */
 router.post("/user/set-username", auth_1.auth, async (req, res) => {
     try {

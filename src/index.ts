@@ -11,6 +11,7 @@ import supplyRoutes from "./routes/supply";
 import activityRoutes from "./routes/activity";
 import redeemRoutes from "./routes/redeem";
 import userRoutes from "./routes/user";
+import gaslessRoutes from "./routes/gasless";
 
 dotenv.config();
 
@@ -36,6 +37,7 @@ app.use("/api", supplyRoutes);
 app.use("/api", activityRoutes);
 app.use("/api", redeemRoutes);
 app.use("/api", userRoutes);
+app.use("/api", gaslessRoutes); // 🔥 Gasless transaction relay
 
 // Metadata Routes (for NFT marketplaces)
 app.use(metadataRoutes);
