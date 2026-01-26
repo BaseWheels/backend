@@ -15,6 +15,7 @@ model User {
   usernameSet     Boolean       @default(false) // Track if user manually set username (one-time only)
   coins           Int           @default(0)
   lastCheckIn     DateTime      @default(now())
+  lastFaucetClaim DateTime?     // Track faucet claim cooldown (24 hours)
   createdAt       DateTime      @default(now())
 
   // Shipping information for physical redemption

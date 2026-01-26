@@ -13,6 +13,9 @@ import {
   CAR_CONTRACT_ADDRESS,
   CAR_CONTRACT_ABI,
 } from "../blockchain/config";
+import { PrismaClient } from "@prisma/client";
+
+const prisma = new PrismaClient();
 
 const router = Router();
 
@@ -41,19 +44,48 @@ router.get("/gasless/server-wallet", async (_req: Request, res: Response) => {
 /**
  * POST /api/gasless/claim-faucet
  * Claim faucet for user (backend pays gas, no Privy needed!)
+ * Cooldown: 24 hours tracked in database
  */
 router.post("/gasless/claim-faucet", auth, async (req: Request, res: Response) => {
   try {
-    const { walletAddress } = req as AuthRequest;
-    if (!walletAddress) {
+    const { walletAddress, userId } = req as AuthRequest;
+    if (!walletAddress || !userId) {
       return res.status(400).json({ error: "Wallet not found" });
     }
 
     // Import backend mint function
     const { claimFaucetForUser } = await import("../blockchain/client");
 
+    // Check cooldown from database
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { lastFaucetClaim: true }
+    });
+
+    if (user?.lastFaucetClaim) {
+      const COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24 hours
+      const timeSinceLastClaim = Date.now() - user.lastFaucetClaim.getTime();
+
+      if (timeSinceLastClaim < COOLDOWN_MS) {
+        const remainingMs = COOLDOWN_MS - timeSinceLastClaim;
+        const remainingHours = Math.ceil(remainingMs / (60 * 60 * 1000));
+
+        return res.status(400).json({
+          error: "Faucet cooldown active",
+          details: `Cooldown aktif! Coba lagi dalam ${remainingHours} jam.`,
+          remainingSeconds: Math.ceil(remainingMs / 1000)
+        });
+      }
+    }
+
     // Backend wallet mints 1,000,000 IDRX to user (backend pays gas!)
     const txHash = await claimFaucetForUser(walletAddress, 1_000_000);
+
+    // Update last claim time in database
+    await prisma.user.update({
+      where: { id: userId },
+      data: { lastFaucetClaim: new Date() }
+    });
 
     res.json({
       success: true,
