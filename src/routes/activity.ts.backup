@@ -41,40 +41,12 @@ router.get("/activity/recent", auth, async (_req: Request, res: Response) => {
       }
     });
 
-    // Fetch recent admin buybacks (last 20) with original seller info
-    const recentBuybacks = await prisma.car.findMany({
-      where: {
-        soldToAdminAt: { not: null },
-        soldByUserId: { not: null } // Only show buybacks with tracked seller
-      },
-      orderBy: { soldToAdminAt: 'desc' },
-      take: 20,
-    });
-
-    // For each buyback, fetch the original seller info separately
-    const buybacksWithSeller = await Promise.all(
-      recentBuybacks.map(async (car) => {
-        if (!car.soldByUserId) return null;
-
-        const seller = await prisma.user.findUnique({
-          where: { id: car.soldByUserId },
-          select: {
-            walletAddress: true,
-            username: true,
-            email: true,
-          }
-        });
-
-        return { car, seller };
-      })
-    );
-
     // Transform to activity format
     const mintActivities = recentMints.map(car => {
       // Use username/email if available, otherwise wallet address
       const displayName = car.user.username ||
-        car.user.email ||
-        `${car.user.walletAddress.slice(0, 6)}...${car.user.walletAddress.slice(-4)}`;
+                         car.user.email ||
+                         `${car.user.walletAddress.slice(0, 6)}...${car.user.walletAddress.slice(-4)}`;
 
       return {
         id: `mint-${car.tokenId}`,
@@ -93,8 +65,8 @@ router.get("/activity/recent", auth, async (_req: Request, res: Response) => {
       .map(car => {
         // Use username/email if available, otherwise wallet address
         const displayName = car.user.username ||
-          car.user.email ||
-          `${car.user.walletAddress.slice(0, 6)}...${car.user.walletAddress.slice(-4)}`;
+                           car.user.email ||
+                           `${car.user.walletAddress.slice(0, 6)}...${car.user.walletAddress.slice(-4)}`;
 
         return {
           id: `redeem-${car.tokenId}`,
@@ -108,31 +80,8 @@ router.get("/activity/recent", auth, async (_req: Request, res: Response) => {
         };
       });
 
-    const buybackActivities = buybacksWithSeller
-      .filter(item => item !== null && item.seller && item.car.soldToAdminAt)
-      .map(item => {
-        const { car, seller } = item!;
-
-        // Use username/email if available, otherwise wallet address
-        const displayName = seller!.username ||
-          seller!.email ||
-          `${seller!.walletAddress.slice(0, 6)}...${seller!.walletAddress.slice(-4)}`;
-
-        return {
-          id: `buyback-${car.tokenId}`,
-          type: 'buyback',
-          user: displayName,
-          action: `sold ${car.series || 'a'} car to admin`,
-          carModel: car.modelName,
-          series: car.series,
-          timestamp: car.soldToAdminAt!,
-          avatar: '💰',
-          verified: true, // ✓ Verified badge for official admin buyback
-        };
-      });
-
     // Combine and sort by timestamp
-    const allActivities = [...mintActivities, ...redeemActivities, ...buybackActivities]
+    const allActivities = [...mintActivities, ...redeemActivities]
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
       .slice(0, 15); // Return top 15 activities
 
@@ -269,27 +218,6 @@ router.get("/activity/history", auth, async (req: Request, res: Response) => {
         timestamp: listing.soldAt || listing.updatedAt,
         icon: '🛒',
       });
-    });
-
-    // Fetch user's admin buyback transactions
-    const userBuybacks = await prisma.car.findMany({
-      where: {
-        soldToAdminAt: { not: null },
-        // Check if this user was the original seller (check via history)
-        // Since we can't easily query previous owner, we'll include all and filter below
-      },
-      orderBy: { soldToAdminAt: 'desc' },
-      take: 50,
-    });
-
-    // Admin buyback activities - only show if current user ID matches
-    // Note: After buyback, owner changes to admin, so we need better tracking
-    // For now, we'll show all buybacks the user initiated
-    userBuybacks.forEach(car => {
-      if (car.soldToAdminAt) {
-        // We can add a separate "soldByUserId" field later, for now skip
-        // Or we show in user history based on other criteria
-      }
     });
 
     // Sort all activities by timestamp

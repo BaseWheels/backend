@@ -56,9 +56,18 @@ export async function mintFragment(
   amount: number = 1
 ): Promise<string> {
   try {
+    // Explicitly fetch latest nonce to prevent nonce conflicts
+    const nonce = await wallet.getNonce('pending');
+    console.log(`[mintFragment] Using nonce: ${nonce} for type ${fragmentType} x${amount}`);
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const tx = await (fragmentContract as any).mintFragment(toAddress, fragmentType, amount);
+    const tx = await (fragmentContract as any).mintFragment(toAddress, fragmentType, amount, {
+      nonce: nonce
+    });
+    console.log(`[mintFragment] Transaction sent: ${tx.hash}`);
+
     const receipt = await tx.wait();
+    console.log(`[mintFragment] Transaction confirmed. Gas used: ${receipt.gasUsed}`);
     return receipt.hash;
   } catch (error) {
     console.error("Mint fragment error:", error);
@@ -76,10 +85,19 @@ export async function mintCar(
   toAddress: string
 ): Promise<{ tokenId: number; txHash: string }> {
   try {
+    // Explicitly fetch latest nonce to prevent nonce conflicts
+    const nonce = await wallet.getNonce('pending');
+    console.log(`[mintCar] Using nonce: ${nonce}`);
+
     // Call contract - it returns tokenId directly
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const tx = await (carContract as any).mintCar(toAddress);
+    const tx = await (carContract as any).mintCar(toAddress, {
+      nonce: nonce
+    });
+    console.log(`[mintCar] Transaction sent: ${tx.hash}`);
+
     const receipt = await tx.wait();
+    console.log(`[mintCar] Transaction confirmed. Gas used: ${receipt.gasUsed}`);
 
     // Parse logs to get tokenId from CarMinted event
     const iface = carContract.interface;
@@ -179,20 +197,58 @@ export async function mintMockIDRX(
   toAddress: string,
   amount: number
 ): Promise<string> {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const decimals: number = await (mockIDRXContract as any).decimals();
-    const amountInWei = ethers.parseUnits(amount.toString(), decimals);
+  const MAX_RETRIES = 3;
+  let lastError: Error | null = null;
 
-    // Use mintTreasury (owner only)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const tx = await (mockIDRXContract as any).mintTreasury(toAddress, amountInWei);
-    const receipt = await tx.wait();
-    return receipt.hash;
-  } catch (error) {
-    console.error("Mint MockIDRX error:", error);
-    throw new Error("Failed to mint MockIDRX on-chain");
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      console.log(`[mintMockIDRX] Attempt ${attempt}/${MAX_RETRIES}`);
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const decimals: number = await (mockIDRXContract as any).decimals();
+      const amountInWei = ethers.parseUnits(amount.toString(), decimals);
+
+      // CRITICAL FIX: Force fetch latest nonce from network (no cache)
+      // Use 'pending' to get nonce including pending transactions
+      if (!wallet.provider) {
+        throw new Error("Wallet provider not initialized");
+      }
+      const nonce = await wallet.provider.getTransactionCount(wallet.address, 'pending');
+      console.log(`[mintMockIDRX] Using nonce: ${nonce} (from 'pending' block)`);
+
+      // Use mintTreasury (owner only) with explicit nonce
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const tx = await (mockIDRXContract as any).mintTreasury(toAddress, amountInWei, {
+        nonce: nonce
+      });
+      console.log(`[mintMockIDRX] Transaction sent: ${tx.hash}`);
+
+      const receipt = await tx.wait();
+      console.log(`[mintMockIDRX] Transaction confirmed. Gas used: ${receipt.gasUsed}`);
+      return receipt.hash;
+
+    } catch (error) {
+      lastError = error as Error;
+      console.error(`[mintMockIDRX] Attempt ${attempt} failed:`, error);
+
+      // Check if it's a nonce error
+      const isNonceError = error instanceof Error && (
+        error.message.includes('nonce') ||
+        error.message.includes('NONCE_EXPIRED')
+      );
+
+      if (isNonceError && attempt < MAX_RETRIES) {
+        console.log(`[mintMockIDRX] Nonce conflict detected, retrying in ${attempt * 500}ms...`);
+        await new Promise(resolve => setTimeout(resolve, attempt * 500));
+        continue;
+      }
+
+      // If not nonce error or last attempt, throw
+      throw new Error(`Failed to mint MockIDRX on-chain: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   }
+
+  throw new Error(`Failed to mint MockIDRX after ${MAX_RETRIES} attempts: ${lastError?.message}`);
 }
 
 /**

@@ -12,6 +12,7 @@ import activityRoutes from "./routes/activity";
 import redeemRoutes from "./routes/redeem";
 import userRoutes from "./routes/user";
 import gaslessRoutes from "./routes/gasless";
+import adminBuybackRoutes from "./routes/admin-buyback";
 
 dotenv.config();
 
@@ -38,6 +39,7 @@ app.use("/api", activityRoutes);
 app.use("/api", redeemRoutes);
 app.use("/api", userRoutes);
 app.use("/api", gaslessRoutes); // 🔥 Gasless transaction relay
+app.use("/api", adminBuybackRoutes); // 💰 Admin buyback / Sell to Admin
 
 // Metadata Routes (for NFT marketplaces)
 app.use(metadataRoutes);
