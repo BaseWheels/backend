@@ -39,6 +39,29 @@ router.get("/activity/recent", auth_1.auth, async (_req, res) => {
                 }
             }
         });
+        // Fetch recent admin buybacks (last 20) with original seller info
+        const recentBuybacks = await prisma_1.prisma.car.findMany({
+            where: {
+                soldToAdminAt: { not: null },
+                soldByUserId: { not: null } // Only show buybacks with tracked seller
+            },
+            orderBy: { soldToAdminAt: 'desc' },
+            take: 20,
+        });
+        // For each buyback, fetch the original seller info separately
+        const buybacksWithSeller = await Promise.all(recentBuybacks.map(async (car) => {
+            if (!car.soldByUserId)
+                return null;
+            const seller = await prisma_1.prisma.user.findUnique({
+                where: { id: car.soldByUserId },
+                select: {
+                    walletAddress: true,
+                    username: true,
+                    email: true,
+                }
+            });
+            return { car, seller };
+        }));
         // Transform to activity format
         const mintActivities = recentMints.map(car => {
             // Use username/email if available, otherwise wallet address
@@ -74,8 +97,28 @@ router.get("/activity/recent", auth_1.auth, async (_req, res) => {
                 avatar: '🔥',
             };
         });
+        const buybackActivities = buybacksWithSeller
+            .filter(item => item !== null && item.seller && item.car.soldToAdminAt)
+            .map(item => {
+            const { car, seller } = item;
+            // Use username/email if available, otherwise wallet address
+            const displayName = seller.username ||
+                seller.email ||
+                `${seller.walletAddress.slice(0, 6)}...${seller.walletAddress.slice(-4)}`;
+            return {
+                id: `buyback-${car.tokenId}`,
+                type: 'buyback',
+                user: displayName,
+                action: `sold ${car.series || 'a'} car to admin`,
+                carModel: car.modelName,
+                series: car.series,
+                timestamp: car.soldToAdminAt,
+                avatar: '💰',
+                verified: true, // ✓ Verified badge for official admin buyback
+            };
+        });
         // Combine and sort by timestamp
-        const allActivities = [...mintActivities, ...redeemActivities]
+        const allActivities = [...mintActivities, ...redeemActivities, ...buybackActivities]
             .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
             .slice(0, 15); // Return top 15 activities
         // Format timestamps to relative time
@@ -103,8 +146,14 @@ router.get("/activity/history", auth_1.auth, async (req, res) => {
     try {
         const { userId } = req;
         // Fetch user's minted cars (gacha wins)
+        // Include cars currently owned AND cars sold to admin (so mint history doesn't disappear after selling)
         const userMints = await prisma_1.prisma.car.findMany({
-            where: { ownerId: userId },
+            where: {
+                OR: [
+                    { ownerId: userId },
+                    { soldByUserId: userId, soldToAdminAt: { not: null } }
+                ]
+            },
             orderBy: { createdAt: 'desc' },
             take: 50,
         });
@@ -202,6 +251,70 @@ router.get("/activity/history", auth_1.auth, async (req, res) => {
                 icon: '🛒',
             });
         });
+        // Fetch user's admin buyback transactions
+        const userBuybacks = await prisma_1.prisma.car.findMany({
+            where: {
+                soldToAdminAt: { not: null },
+                soldByUserId: userId, // Only show buybacks where this user was the seller
+            },
+            orderBy: { soldToAdminAt: 'desc' },
+            take: 50,
+        });
+        // Admin buyback activities
+        userBuybacks.forEach(car => {
+            if (car.soldToAdminAt) {
+                activities.push({
+                    id: `buyback-${car.tokenId}`,
+                    type: 'buyback',
+                    action: 'Sold to Admin',
+                    carModel: car.modelName,
+                    series: car.series,
+                    rarity: determineRarity(car.series),
+                    tokenId: car.tokenId,
+                    timestamp: car.soldToAdminAt,
+                    icon: '💰',
+                });
+            }
+        });
+        // Fetch user's assembled cars (fragments that were used for assembly)
+        const userAssembledCars = await prisma_1.prisma.fragment.findMany({
+            where: {
+                userId,
+                isUsed: true,
+            },
+            orderBy: { createdAt: 'desc' },
+            take: 50,
+        });
+        // Group assembled fragments by brand and approximate assembly time
+        const assembledByBrandTime = {};
+        userAssembledCars.forEach(fragment => {
+            const timeKey = Math.floor(fragment.createdAt.getTime() / 60000); // Round to minute
+            const key = `${fragment.brand}-${timeKey}`;
+            if (!assembledByBrandTime[key]) {
+                assembledByBrandTime[key] = {
+                    brand: fragment.brand,
+                    series: fragment.series,
+                    timestamp: fragment.createdAt,
+                    count: 0,
+                };
+            }
+            assembledByBrandTime[key].count++;
+        });
+        // Find assembly events (where 5 fragments were used at similar time)
+        Object.values(assembledByBrandTime).forEach((assembly) => {
+            if (assembly.count >= 5) {
+                activities.push({
+                    id: `assembly-${assembly.brand}-${assembly.timestamp.getTime()}`,
+                    type: 'assembly',
+                    action: 'Assembled Car',
+                    carModel: assembly.brand,
+                    series: assembly.series,
+                    rarity: determineRarity(assembly.series),
+                    timestamp: assembly.timestamp,
+                    icon: '🔧',
+                });
+            }
+        });
         // Sort all activities by timestamp
         const sortedActivities = activities
             .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
@@ -221,6 +334,8 @@ router.get("/activity/history", auth_1.auth, async (req, res) => {
                 totalListings: userListings.length,
                 totalSales: userListings.filter((l) => l.status === 'sold').length,
                 totalPurchases: userPurchases.length,
+                totalBuybacks: userBuybacks.length,
+                totalAssemblies: Object.values(assembledByBrandTime).filter((a) => a.count >= 5).length,
             }
         });
     }

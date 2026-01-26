@@ -17,14 +17,36 @@ import {
 const router = Router();
 
 /**
+ * GET /api/gasless/server-wallet
+ * Get server wallet address for user approval
+ */
+router.get("/gasless/server-wallet", async (_req: Request, res: Response) => {
+  try {
+    const { wallet } = await import("../blockchain/client");
+
+    res.json({
+      success: true,
+      serverWallet: wallet.address,
+      message: "Users must approve this address to use gasless transactions"
+    });
+  } catch (error: any) {
+    console.error("Get server wallet error:", error);
+    res.status(500).json({
+      error: "Failed to get server wallet",
+      details: error.message
+    });
+  }
+});
+
+/**
  * POST /api/gasless/claim-faucet
  * Relay claimFaucet transaction with gas sponsorship
  */
 router.post("/gasless/claim-faucet", auth, async (req: Request, res: Response) => {
   try {
-    const walletAddress = (req as AuthRequest).walletAddress;
-    if (!walletAddress) {
-      return res.status(400).json({ error: "Wallet address not found" });
+    const { walletId, walletAddress } = req as AuthRequest;
+    if (!walletId || !walletAddress) {
+      return res.status(400).json({ error: "Wallet not found" });
     }
 
     // Encode claimFaucet() function call
@@ -33,7 +55,7 @@ router.post("/gasless/claim-faucet", auth, async (req: Request, res: Response) =
 
     // Send gasless transaction
     const txHash = await sendGaslessTransaction(
-      walletAddress,
+      walletId,
       {
         to: MOCKIDRX_CONTRACT_ADDRESS,
         data,
@@ -68,9 +90,9 @@ router.post("/gasless/claim-faucet", auth, async (req: Request, res: Response) =
  */
 router.post("/gasless/approve-mockidrx", auth, async (req: Request, res: Response) => {
   try {
-    const walletAddress = (req as AuthRequest).walletAddress;
-    if (!walletAddress) {
-      return res.status(400).json({ error: "Wallet address not found" });
+    const { walletId, walletAddress } = req as AuthRequest;
+    if (!walletId || !walletAddress) {
+      return res.status(400).json({ error: "Wallet not found" });
     }
 
     const { spender, amount } = req.body;
@@ -80,12 +102,12 @@ router.post("/gasless/approve-mockidrx", auth, async (req: Request, res: Respons
 
     // Encode approve(spender, amount) function call
     const iface = new ethers.Interface(MOCKIDRX_CONTRACT_ABI);
-    const amountWei = ethers.parseUnits(amount.toString(), 18); // MockIDRX has 18 decimals
+    const amountWei = ethers.parseUnits(amount.toString(), 2); // MockIDRXv2 has 2 decimals
     const data = iface.encodeFunctionData("approve", [spender, amountWei]);
 
     // Send gasless transaction
     const txHash = await sendGaslessTransaction(
-      walletAddress,
+      walletId,
       {
         to: MOCKIDRX_CONTRACT_ADDRESS,
         data,
@@ -109,13 +131,14 @@ router.post("/gasless/approve-mockidrx", auth, async (req: Request, res: Respons
 
 /**
  * POST /api/gasless/pay-for-spin
- * Relay payForSpin() transaction with gas sponsorship
+ * Server wallet pays gas and calls payForSpinOnBehalfOf()
+ * User must approve server wallet first!
  */
 router.post("/gasless/pay-for-spin", auth, async (req: Request, res: Response) => {
   try {
-    const walletAddress = (req as AuthRequest).walletAddress;
+    const { walletAddress } = req as AuthRequest;
     if (!walletAddress) {
-      return res.status(400).json({ error: "Wallet address not found" });
+      return res.status(400).json({ error: "Wallet not found" });
     }
 
     const { amount } = req.body;
@@ -123,32 +146,35 @@ router.post("/gasless/pay-for-spin", auth, async (req: Request, res: Response) =
       return res.status(400).json({ error: "Missing amount" });
     }
 
-    // Encode payForSpin(amount) function call
-    const iface = new ethers.Interface(MOCKIDRX_CONTRACT_ABI);
-    const amountWei = ethers.parseUnits(amount.toString(), 18);
-    const data = iface.encodeFunctionData("payForSpin", [amountWei]);
+    // Import server wallet and contract
+    const { mockIDRXContract } = await import("../blockchain/client");
 
-    // Send gasless transaction
-    const txHash = await sendGaslessTransaction(
-      walletAddress,
-      {
-        to: MOCKIDRX_CONTRACT_ADDRESS,
-        data,
-      },
-      84532
-    );
+    // Convert amount to token units (MockIDRXv2 has 2 decimals)
+    const amountWei = ethers.parseUnits(amount.toString(), 2);
+
+    console.log(`[payForSpin] Server calling payForSpinOnBehalfOf for user ${walletAddress}, amount: ${amount}`);
+
+    // Server wallet calls payForSpinOnBehalfOf (server pays gas!)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const tx = await (mockIDRXContract as any).payForSpinOnBehalfOf(walletAddress, amountWei);
+    console.log(`[payForSpin] Transaction sent: ${tx.hash}`);
+
+    const receipt = await tx.wait();
+    console.log(`[payForSpin] Transaction confirmed. Gas used: ${receipt.gasUsed}`);
 
     res.json({
       success: true,
-      txHash,
-      message: "Paid for spin successfully (gasless!)",
+      txHash: receipt.hash,
+      message: "Paid for spin successfully (server gasless!)",
     });
   } catch (error: any) {
     console.error("Pay for spin relay error:", error);
 
     let errorMessage = "Failed to pay for spin";
-    if (error.message?.includes("Insufficient balance")) {
+    if (error.message?.includes("Insufficient balance") || error.message?.includes("insufficient balance")) {
       errorMessage = "Insufficient MockIDRX balance";
+    } else if (error.message?.includes("insufficient allowance") || error.message?.includes("not approved")) {
+      errorMessage = "Please approve server wallet first";
     }
 
     res.status(500).json({
@@ -164,9 +190,9 @@ router.post("/gasless/pay-for-spin", auth, async (req: Request, res: Response) =
  */
 router.post("/gasless/burn-mockidrx", auth, async (req: Request, res: Response) => {
   try {
-    const walletAddress = (req as AuthRequest).walletAddress;
-    if (!walletAddress) {
-      return res.status(400).json({ error: "Wallet address not found" });
+    const { walletId, walletAddress } = req as AuthRequest;
+    if (!walletId || !walletAddress) {
+      return res.status(400).json({ error: "Wallet not found" });
     }
 
     const { amount } = req.body;
@@ -176,12 +202,12 @@ router.post("/gasless/burn-mockidrx", auth, async (req: Request, res: Response) 
 
     // Encode burn(amount) function call
     const iface = new ethers.Interface(MOCKIDRX_CONTRACT_ABI);
-    const amountWei = ethers.parseUnits(amount.toString(), 18);
+    const amountWei = ethers.parseUnits(amount.toString(), 2); // MockIDRXv2 has 2 decimals
     const data = iface.encodeFunctionData("burn", [amountWei]);
 
     // Send gasless transaction
     const txHash = await sendGaslessTransaction(
-      walletAddress,
+      walletId,
       {
         to: MOCKIDRX_CONTRACT_ADDRESS,
         data,
@@ -215,9 +241,9 @@ router.post("/gasless/burn-mockidrx", auth, async (req: Request, res: Response) 
  */
 router.post("/gasless/approve-car-nft", auth, async (req: Request, res: Response) => {
   try {
-    const walletAddress = (req as AuthRequest).walletAddress;
-    if (!walletAddress) {
-      return res.status(400).json({ error: "Wallet address not found" });
+    const { walletId, walletAddress } = req as AuthRequest;
+    if (!walletId || !walletAddress) {
+      return res.status(400).json({ error: "Wallet not found" });
     }
 
     const { spender, tokenId } = req.body;
@@ -231,7 +257,7 @@ router.post("/gasless/approve-car-nft", auth, async (req: Request, res: Response
 
     // Send gasless transaction
     const txHash = await sendGaslessTransaction(
-      walletAddress,
+      walletId,
       {
         to: CAR_CONTRACT_ADDRESS,
         data,

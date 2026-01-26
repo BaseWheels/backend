@@ -77,7 +77,10 @@ router.post("/assembly/forge", auth_1.auth, async (req, res) => {
         const fragmentIdsToUse = [0, 1, 2, 3, 4].map(typeId => fragmentsByType[typeId][0].id);
         // 5.6. Check supply cap (RWA management)
         const currentMinted = await prisma_1.prisma.car.count({
-            where: { series: carSeries },
+            where: {
+                series: carSeries,
+                soldToAdminAt: null, // Exclude cars sold to admin
+            },
         });
         const supplyStatus = (0, supply_1.getSupplyStatus)(carSeries, currentMinted);
         if (supplyStatus.soldOut) {

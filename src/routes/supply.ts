@@ -20,9 +20,12 @@ router.get("/supply/status/:series", auth, async (req: Request, res: Response) =
       return;
     }
 
-    // Count minted cars for this series
+    // Count minted cars for this series (exclude cars sold to admin)
     const currentMinted = await prisma.car.count({
-      where: { series: series },
+      where: {
+        series: series,
+        soldToAdminAt: null, // Exclude cars sold to admin
+      },
     });
 
     // Get waiting list count
@@ -52,7 +55,10 @@ router.get("/supply/status", auth, async (_: Request, res: Response) => {
     const statuses = await Promise.all(
       allSeries.map(async (series) => {
         const currentMinted = await prisma.car.count({
-          where: { series },
+          where: {
+            series,
+            soldToAdminAt: null, // Exclude cars sold to admin
+          },
         });
         const waitingListCount = await prisma.waitingList.count({
           where: { series, status: "waiting" },

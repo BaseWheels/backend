@@ -18,7 +18,10 @@ async function auth(req, res, next) {
         }
         const claims = await privy.verifyAuthToken(token);
         const user = await privy.getUser(claims.userId);
-        const walletAddress = user.wallet?.address;
+        // Get embedded wallet info
+        const embeddedWallet = user.linkedAccounts?.find((account) => account.type === 'wallet' && account.walletClientType === 'privy');
+        const walletAddress = embeddedWallet?.address || user.wallet?.address;
+        const walletId = embeddedWallet?.address || walletAddress; // For Privy gasless, use wallet address as ID
         if (!walletAddress) {
             res.status(400).json({ error: "User has no linked wallet" });
             return;
@@ -61,6 +64,7 @@ async function auth(req, res, next) {
         });
         req.userId = claims.userId;
         req.walletAddress = walletAddress.toLowerCase();
+        req.walletId = walletId; // For gasless transactions
         next();
     }
     catch (error) {
