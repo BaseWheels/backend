@@ -21,6 +21,19 @@ exports.MOCKIDRX_CONTRACT_ABI = [
         "type": "function"
     },
     {
+        "inputs": [],
+        "name": "serverWallet",
+        "outputs": [
+            {
+                "internalType": "address",
+                "name": "",
+                "type": "address"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
         "inputs": [
             {
                 "internalType": "address",
@@ -118,11 +131,60 @@ exports.MOCKIDRX_CONTRACT_ABI = [
         "inputs": [
             {
                 "internalType": "uint256",
+                "name": "rupiahAmount",
+                "type": "uint256"
+            }
+        ],
+        "name": "burnRupiah",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "uint256",
                 "name": "spinCost",
                 "type": "uint256"
             }
         ],
         "name": "payForSpin",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "address",
+                "name": "user",
+                "type": "address"
+            },
+            {
+                "internalType": "uint256",
+                "name": "spinCost",
+                "type": "uint256"
+            }
+        ],
+        "name": "payForSpinOnBehalfOf",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "address[]",
+                "name": "users",
+                "type": "address[]"
+            },
+            {
+                "internalType": "uint256[]",
+                "name": "spinCosts",
+                "type": "uint256[]"
+            }
+        ],
+        "name": "batchPayForSpinOnBehalfOf",
         "outputs": [],
         "stateMutability": "nonpayable",
         "type": "function"
@@ -136,6 +198,32 @@ exports.MOCKIDRX_CONTRACT_ABI = [
             }
         ],
         "name": "burnForSpin",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "address",
+                "name": "_newServer",
+                "type": "address"
+            }
+        ],
+        "name": "setServerWallet",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "address",
+                "name": "_newTreasury",
+                "type": "address"
+            }
+        ],
+        "name": "setTreasuryWallet",
         "outputs": [],
         "stateMutability": "nonpayable",
         "type": "function"
@@ -244,6 +332,25 @@ exports.MOCKIDRX_CONTRACT_ABI = [
         "type": "function"
     },
     {
+        "inputs": [
+            {
+                "internalType": "uint256",
+                "name": "rupiah",
+                "type": "uint256"
+            }
+        ],
+        "name": "toTokenAmount",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "pure",
+        "type": "function"
+    },
+    {
         "anonymous": false,
         "inputs": [
             {
@@ -285,6 +392,50 @@ exports.MOCKIDRX_CONTRACT_ABI = [
             }
         ],
         "name": "SpinPayment",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            {
+                "indexed": true,
+                "internalType": "address",
+                "name": "user",
+                "type": "address"
+            },
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "cost",
+                "type": "uint256"
+            },
+            {
+                "indexed": true,
+                "internalType": "address",
+                "name": "relayer",
+                "type": "address"
+            }
+        ],
+        "name": "SpinPaidOnBehalf",
+        "type": "event"
+    },
+    {
+        "anonymous": false,
+        "inputs": [
+            {
+                "indexed": true,
+                "internalType": "address",
+                "name": "oldServer",
+                "type": "address"
+            },
+            {
+                "indexed": true,
+                "internalType": "address",
+                "name": "newServer",
+                "type": "address"
+            }
+        ],
+        "name": "ServerWalletUpdated",
         "type": "event"
     },
     {

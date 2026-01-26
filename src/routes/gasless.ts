@@ -40,33 +40,25 @@ router.get("/gasless/server-wallet", async (_req: Request, res: Response) => {
 
 /**
  * POST /api/gasless/claim-faucet
- * Relay claimFaucet transaction with gas sponsorship
+ * Claim faucet for user (backend pays gas, no Privy needed!)
  */
 router.post("/gasless/claim-faucet", auth, async (req: Request, res: Response) => {
   try {
-    const { walletId, walletAddress } = req as AuthRequest;
-    if (!walletId || !walletAddress) {
+    const { walletAddress } = req as AuthRequest;
+    if (!walletAddress) {
       return res.status(400).json({ error: "Wallet not found" });
     }
 
-    // Encode claimFaucet() function call
-    const iface = new ethers.Interface(MOCKIDRX_CONTRACT_ABI);
-    const data = iface.encodeFunctionData("claimFaucet", []);
+    // Import backend mint function
+    const { claimFaucetForUser } = await import("../blockchain/client");
 
-    // Send gasless transaction
-    const txHash = await sendGaslessTransaction(
-      walletId,
-      {
-        to: MOCKIDRX_CONTRACT_ADDRESS,
-        data,
-      },
-      84532 // Base Sepolia
-    );
+    // Backend wallet mints 1,000,000 IDRX to user (backend pays gas!)
+    const txHash = await claimFaucetForUser(walletAddress, 1_000_000);
 
     res.json({
       success: true,
       txHash,
-      message: "Faucet claimed successfully (gasless!)",
+      message: "Faucet claimed successfully! +1,000,000 IDRX",
     });
   } catch (error: any) {
     console.error("Claim faucet relay error:", error);

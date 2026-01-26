@@ -73,4 +73,12 @@ export declare function verifyBurnTransaction(txHash: string, expectedBurner: st
  * @note User must approve backend wallet first before this can work
  */
 export declare function burnMockIDRX(fromAddress: string, amount: number): Promise<string>;
+/**
+ * Claim faucet for user (backend pays gas)
+ * @param userAddress - User wallet address to receive faucet
+ * @param amount - Amount to mint (default: 1,000,000 IDRX)
+ * @returns Transaction hash
+ * @note Backend wallet pays gas, cooldown tracked on-chain in contract
+ */
+export declare function claimFaucetForUser(userAddress: string, amount?: number): Promise<string>;
 //# sourceMappingURL=client.d.ts.map

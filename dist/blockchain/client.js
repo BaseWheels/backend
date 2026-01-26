@@ -10,6 +10,7 @@ exports.mintMockIDRX = mintMockIDRX;
 exports.verifyTransferTransaction = verifyTransferTransaction;
 exports.verifyBurnTransaction = verifyBurnTransaction;
 exports.burnMockIDRX = burnMockIDRX;
+exports.claimFaucetForUser = claimFaucetForUser;
 const ethers_1 = require("ethers");
 const config_1 = require("./config");
 if (!process.env.RPC_URL) {
@@ -349,6 +350,26 @@ async function burnMockIDRX(fromAddress, amount) {
             throw new Error("User must approve backend wallet to spend MockIDRX tokens");
         }
         throw new Error("Failed to burn MockIDRX on-chain");
+    }
+}
+/**
+ * Claim faucet for user (backend pays gas)
+ * @param userAddress - User wallet address to receive faucet
+ * @param amount - Amount to mint (default: 1,000,000 IDRX)
+ * @returns Transaction hash
+ * @note Backend wallet pays gas, cooldown tracked on-chain in contract
+ */
+async function claimFaucetForUser(userAddress, amount = 1000000) {
+    try {
+        console.log(`[claimFaucetForUser] Claiming ${amount} IDRX for ${userAddress}`);
+        // Mint IDRX to user using backend wallet (backend pays gas)
+        const txHash = await mintMockIDRX(userAddress, amount);
+        console.log(`[claimFaucetForUser] Success! TX: ${txHash}`);
+        return txHash;
+    }
+    catch (error) {
+        console.error("Claim faucet for user error:", error);
+        throw new Error(`Failed to claim faucet: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
 }
 //# sourceMappingURL=client.js.map

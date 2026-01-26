@@ -21,7 +21,7 @@ async function auth(req, res, next) {
         // Get embedded wallet info
         const embeddedWallet = user.linkedAccounts?.find((account) => account.type === 'wallet' && account.walletClientType === 'privy');
         const walletAddress = embeddedWallet?.address || user.wallet?.address;
-        const walletId = embeddedWallet?.address || walletAddress; // For Privy gasless, use wallet address as ID
+        const walletId = embeddedWallet?.id; // Privy's internal wallet ID (NOT the blockchain address!)
         if (!walletAddress) {
             res.status(400).json({ error: "User has no linked wallet" });
             return;
