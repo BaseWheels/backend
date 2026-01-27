@@ -5,7 +5,7 @@ import {
   FRAGMENT_CONTRACT_ABI,
   FRAGMENT_CONTRACT_ADDRESS,
   CAR_CONTRACT_ABI,
-  CAR_CONTRACT_ADDRESS
+  CAR_CONTRACT_ADDRESS,
 } from "./config";
 
 if (!process.env.RPC_URL) {
@@ -17,10 +17,7 @@ if (!process.env.BACKEND_PRIVATE_KEY) {
 }
 
 export const provider = new ethers.JsonRpcProvider(process.env.RPC_URL);
-export const wallet = new ethers.Wallet(
-  process.env.BACKEND_PRIVATE_KEY,
-  provider
-);
+export const wallet = new ethers.Wallet(process.env.BACKEND_PRIVATE_KEY, provider);
 
 // MockIDRX Token Contract (ERC20)
 export const mockIDRXContract = new ethers.Contract(
@@ -37,11 +34,7 @@ export const fragmentContract = new ethers.Contract(
 );
 
 // Car Contract (ERC721)
-export const carContract = new ethers.Contract(
-  CAR_CONTRACT_ADDRESS,
-  CAR_CONTRACT_ABI,
-  wallet
-);
+export const carContract = new ethers.Contract(CAR_CONTRACT_ADDRESS, CAR_CONTRACT_ABI, wallet);
 
 /**
  * Mint a fragment NFT to a user
@@ -56,18 +49,14 @@ export async function mintFragment(
   amount: number = 1
 ): Promise<string> {
   try {
-    // Explicitly fetch latest nonce to prevent nonce conflicts
-    const nonce = await wallet.getNonce('pending');
-    console.log(`[mintFragment] Using nonce: ${nonce} for type ${fragmentType} x${amount}`);
+    const nonce = await wallet.getNonce("pending");
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const tx = await (fragmentContract as any).mintFragment(toAddress, fragmentType, amount, {
-      nonce: nonce
+      nonce,
     });
-    console.log(`[mintFragment] Transaction sent: ${tx.hash}`);
 
     const receipt = await tx.wait();
-    console.log(`[mintFragment] Transaction confirmed. Gas used: ${receipt.gasUsed}`);
     return receipt.hash;
   } catch (error) {
     console.error("Mint fragment error:", error);
@@ -81,25 +70,14 @@ export async function mintFragment(
  * @returns Object with tokenId and transaction hash
  * @note Contract auto-generates tokenId. ModelName/series stored off-chain in backend DB.
  */
-export async function mintCar(
-  toAddress: string
-): Promise<{ tokenId: number; txHash: string }> {
+export async function mintCar(toAddress: string): Promise<{ tokenId: number; txHash: string }> {
   try {
-    // Explicitly fetch latest nonce to prevent nonce conflicts
-    const nonce = await wallet.getNonce('pending');
-    console.log(`[mintCar] Using nonce: ${nonce}`);
+    const nonce = await wallet.getNonce("pending");
 
-    // Call contract - it returns tokenId directly
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const tx = await (carContract as any).mintCar(toAddress, {
-      nonce: nonce
-    });
-    console.log(`[mintCar] Transaction sent: ${tx.hash}`);
-
+    const tx = await (carContract as any).mintCar(toAddress, { nonce });
     const receipt = await tx.wait();
-    console.log(`[mintCar] Transaction confirmed. Gas used: ${receipt.gasUsed}`);
 
-    // Parse logs to get tokenId from CarMinted event
     const iface = carContract.interface;
     let tokenId = 0;
 
@@ -118,7 +96,7 @@ export async function mintCar(
 
     return {
       tokenId,
-      txHash: receipt.hash
+      txHash: receipt.hash,
     };
   } catch (error) {
     console.error("Mint car error:", error);
@@ -133,11 +111,8 @@ export async function mintCar(
  */
 export async function checkAllParts(userAddress: string): Promise<boolean> {
   try {
-    // Contract returns array of balances [CHASSIS, WHEELS, ENGINE, BODY, INTERIOR]
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const balances: bigint[] = await (fragmentContract as any).checkAllParts(userAddress);
-
-    // Check if user has at least 1 of each fragment type
     return balances.every((balance) => balance >= 1n);
   } catch (error) {
     console.error("Check all parts error:", error);
@@ -152,9 +127,8 @@ export async function checkAllParts(userAddress: string): Promise<boolean> {
  */
 export async function burnForAssembly(fromAddress: string): Promise<string> {
   try {
-    // Burn 1 of each fragment type (0-4)
-    const fragmentIds = [0, 1, 2, 3, 4]; // CHASSIS, WHEELS, ENGINE, BODY, INTERIOR
-    const amounts = [1, 1, 1, 1, 1]; // 1 of each
+    const fragmentIds = [0, 1, 2, 3, 4];
+    const amounts = [1, 1, 1, 1, 1];
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const tx = await (fragmentContract as any).burnForAssembly(fromAddress, fragmentIds, amounts);
@@ -177,8 +151,6 @@ export async function getMockIDRXBalance(userAddress: string): Promise<number> {
     const balance: bigint = await (mockIDRXContract as any).balanceOf(userAddress);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const decimals: number = await (mockIDRXContract as any).decimals();
-
-    // Convert from wei to token units
     return parseFloat(ethers.formatUnits(balance, decimals));
   } catch (error) {
     console.error("Get MockIDRX balance error:", error);
@@ -193,10 +165,7 @@ export async function getMockIDRXBalance(userAddress: string): Promise<number> {
  * @returns Transaction hash
  * @note Requires backend wallet to be contract owner
  */
-export async function mintMockIDRX(
-  toAddress: string,
-  amount: number
-): Promise<string> {
+export async function mintMockIDRX(toAddress: string, amount: number): Promise<string> {
   const MAX_RETRIES = 3;
   let lastError: Error | null = null;
 
@@ -208,43 +177,33 @@ export async function mintMockIDRX(
       const decimals: number = await (mockIDRXContract as any).decimals();
       const amountInWei = ethers.parseUnits(amount.toString(), decimals);
 
-      // CRITICAL FIX: Force fetch latest nonce from network (no cache)
-      // Use 'pending' to get nonce including pending transactions
       if (!wallet.provider) {
         throw new Error("Wallet provider not initialized");
       }
-      const nonce = await wallet.provider.getTransactionCount(wallet.address, 'pending');
-      console.log(`[mintMockIDRX] Using nonce: ${nonce} (from 'pending' block)`);
+      const nonce = await wallet.provider.getTransactionCount(wallet.address, "pending");
 
-      // Use mintTreasury (owner only) with explicit nonce
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const tx = await (mockIDRXContract as any).mintTreasury(toAddress, amountInWei, {
-        nonce: nonce
-      });
-      console.log(`[mintMockIDRX] Transaction sent: ${tx.hash}`);
-
+      const tx = await (mockIDRXContract as any).mintTreasury(toAddress, amountInWei, { nonce });
       const receipt = await tx.wait();
-      console.log(`[mintMockIDRX] Transaction confirmed. Gas used: ${receipt.gasUsed}`);
       return receipt.hash;
-
     } catch (error) {
       lastError = error as Error;
       console.error(`[mintMockIDRX] Attempt ${attempt} failed:`, error);
 
       // Check if it's a nonce error
-      const isNonceError = error instanceof Error && (
-        error.message.includes('nonce') ||
-        error.message.includes('NONCE_EXPIRED')
-      );
+      const isNonceError =
+        error instanceof Error &&
+        (error.message.includes("nonce") || error.message.includes("NONCE_EXPIRED"));
 
       if (isNonceError && attempt < MAX_RETRIES) {
-        console.log(`[mintMockIDRX] Nonce conflict detected, retrying in ${attempt * 500}ms...`);
-        await new Promise(resolve => setTimeout(resolve, attempt * 500));
+        await new Promise((resolve) => setTimeout(resolve, attempt * 500));
         continue;
       }
 
       // If not nonce error or last attempt, throw
-      throw new Error(`Failed to mint MockIDRX on-chain: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(
+        `Failed to mint MockIDRX on-chain: ${error instanceof Error ? error.message : "Unknown error"}`
+      );
     }
   }
 
@@ -300,9 +259,11 @@ export async function verifyTransferTransaction(
           const treasury = parsed.args[2];
 
           // Verify sender, amount, and treasury
-          if (user.toLowerCase() === expectedSender.toLowerCase() &&
-              cost >= expectedAmountInWei &&
-              treasury.toLowerCase() === treasuryWallet.toLowerCase()) {
+          if (
+            user.toLowerCase() === expectedSender.toLowerCase() &&
+            cost >= expectedAmountInWei &&
+            treasury.toLowerCase() === treasuryWallet.toLowerCase()
+          ) {
             return true;
           }
         }
@@ -314,9 +275,11 @@ export async function verifyTransferTransaction(
           const value = parsed.args[2];
 
           // Verify sender, receiver (treasury), and amount
-          if (from.toLowerCase() === expectedSender.toLowerCase() &&
-              to.toLowerCase() === treasuryWallet.toLowerCase() &&
-              value >= expectedAmountInWei) {
+          if (
+            from.toLowerCase() === expectedSender.toLowerCase() &&
+            to.toLowerCase() === treasuryWallet.toLowerCase() &&
+            value >= expectedAmountInWei
+          ) {
             return true;
           }
         }
@@ -329,7 +292,9 @@ export async function verifyTransferTransaction(
     throw new Error("No valid SpinPayment or Transfer event found in transaction");
   } catch (error) {
     console.error("Verify transfer transaction error:", error);
-    throw new Error(`Failed to verify transfer transaction: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    throw new Error(
+      `Failed to verify transfer transaction: ${error instanceof Error ? error.message : "Unknown error"}`
+    );
   }
 }
 
@@ -377,8 +342,10 @@ export async function verifyBurnTransaction(
           const amount = parsed.args[1];
 
           // Verify burner and amount
-          if (burner.toLowerCase() === expectedBurner.toLowerCase() &&
-              amount >= expectedAmountInWei) {
+          if (
+            burner.toLowerCase() === expectedBurner.toLowerCase() &&
+            amount >= expectedAmountInWei
+          ) {
             return true;
           }
         }
@@ -391,7 +358,9 @@ export async function verifyBurnTransaction(
     throw new Error("No valid TokenBurned event found in transaction");
   } catch (error) {
     console.error("Verify burn transaction error:", error);
-    throw new Error(`Failed to verify burn transaction: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    throw new Error(
+      `Failed to verify burn transaction: ${error instanceof Error ? error.message : "Unknown error"}`
+    );
   }
 }
 
@@ -403,10 +372,7 @@ export async function verifyBurnTransaction(
  * @returns Transaction hash
  * @note User must approve backend wallet first before this can work
  */
-export async function burnMockIDRX(
-  fromAddress: string,
-  amount: number
-): Promise<string> {
+export async function burnMockIDRX(fromAddress: string, amount: number): Promise<string> {
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const decimals: number = await (mockIDRXContract as any).decimals();
@@ -450,6 +416,8 @@ export async function claimFaucetForUser(
     return txHash;
   } catch (error) {
     console.error("Claim faucet for user error:", error);
-    throw new Error(`Failed to claim faucet: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    throw new Error(
+      `Failed to claim faucet: ${error instanceof Error ? error.message : "Unknown error"}`
+    );
   }
 }

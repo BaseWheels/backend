@@ -7,10 +7,7 @@ import { carContract, wallet, mintMockIDRX } from "./client";
  * @param expectedOwner - Expected owner wallet address
  * @returns True if expectedOwner owns the car
  */
-export async function verifyCarOwnership(
-  tokenId: number,
-  expectedOwner: string
-): Promise<boolean> {
+export async function verifyCarOwnership(tokenId: number, expectedOwner: string): Promise<boolean> {
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const owner: string = await (carContract as any).ownerOf(tokenId);
@@ -27,10 +24,7 @@ export async function verifyCarOwnership(
  * @param tokenId - Car NFT token ID
  * @returns Transaction hash
  */
-export async function transferCarToAdmin(
-  fromAddress: string,
-  tokenId: number
-): Promise<string> {
+export async function transferCarToAdmin(fromAddress: string, tokenId: number): Promise<string> {
   try {
     console.log("=== transferCarToAdmin START ===");
     console.log("From:", fromAddress);
@@ -46,7 +40,10 @@ export async function transferCarToAdmin(
     // Check if backend has approval to transfer this NFT
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const approved: string = await (carContract as any).getApproved(tokenId);
-    const isApprovedForAll: boolean = await (carContract as any).isApprovedForAll(fromAddress, wallet.address);
+    const isApprovedForAll: boolean = await (carContract as any).isApprovedForAll(
+      fromAddress,
+      wallet.address
+    );
 
     console.log("Approved address:", approved);
     console.log("Is approved for all:", isApprovedForAll);
@@ -58,7 +55,7 @@ export async function transferCarToAdmin(
     }
 
     // Explicitly fetch latest nonce to prevent nonce conflicts
-    const nonce = await wallet.getNonce('pending');
+    const nonce = await wallet.getNonce("pending");
     console.log(`[transferCarToAdmin] Using nonce: ${nonce}`);
 
     // Transfer NFT from user to admin wallet using safeTransferFrom
@@ -81,8 +78,7 @@ export async function transferCarToAdmin(
     console.error("Transfer car to admin error:", error);
     console.error("=== transferCarToAdmin FAILED ===");
     throw new Error(
-      `Failed to transfer car to admin: ${error instanceof Error ? error.message : "Unknown error"
-      }`
+      `Failed to transfer car to admin: ${error instanceof Error ? error.message : "Unknown error"}`
     );
   }
 }
@@ -113,7 +109,7 @@ export async function executeAdminBuyback(
     // CRITICAL: Wait 1 second to ensure nonce is updated in network
     // This prevents ethers.js from returning stale/cached nonce
     console.log("Waiting 1 second for nonce update...");
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await new Promise((resolve) => setTimeout(resolve, 1000));
 
     // Step 2: Mint IDRX to user
     console.log("Step 2: Minting IDRX to user...");
@@ -141,8 +137,7 @@ export async function executeAdminBuyback(
     }
 
     throw new Error(
-      `Failed to execute admin buyback: ${error instanceof Error ? error.message : "Unknown error"
-      }`
+      `Failed to execute admin buyback: ${error instanceof Error ? error.message : "Unknown error"}`
     );
   }
 }

@@ -7,10 +7,7 @@ import { carContract, mockIDRXContract, wallet, provider } from "./client";
  * @param expectedOwner - Expected owner wallet address
  * @returns True if expectedOwner owns the car
  */
-export async function verifyCarOwnership(
-  tokenId: number,
-  expectedOwner: string
-): Promise<boolean> {
+export async function verifyCarOwnership(tokenId: number, expectedOwner: string): Promise<boolean> {
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const owner: string = await (carContract as any).ownerOf(tokenId);
@@ -43,20 +40,14 @@ export async function verifyCarApproval(tokenId: number): Promise<boolean> {
  * @param amount - Amount of IDRX needed (in token units, not wei)
  * @returns True if allowance is sufficient
  */
-export async function verifyIDRXAllowance(
-  owner: string,
-  amount: number
-): Promise<boolean> {
+export async function verifyIDRXAllowance(owner: string, amount: number): Promise<boolean> {
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const decimals: number = await (mockIDRXContract as any).decimals();
     const amountWei = ethers.parseUnits(amount.toString(), decimals);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const allowance: bigint = await (mockIDRXContract as any).allowance(
-      owner,
-      wallet.address
-    );
+    const allowance: bigint = await (mockIDRXContract as any).allowance(owner, wallet.address);
 
     return allowance >= amountWei;
   } catch (error) {
@@ -80,44 +71,32 @@ export async function executePurchase(
   price: number
 ): Promise<{ txHash: string }> {
   try {
-    console.log("=== executePurchase START ===");
-    console.log("TokenId:", tokenId);
-    console.log("Buyer:", buyerAddress);
-    console.log("Seller:", sellerAddress);
-    console.log("Price:", price);
-    console.log("Backend wallet:", wallet.address);
-
-    // Get decimals for IDRX
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const decimals: number = await (mockIDRXContract as any).decimals();
     const priceWei = ethers.parseUnits(price.toString(), decimals);
-    console.log("Price in wei:", priceWei.toString());
 
-    // Verify allowance before transfer
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const allowance = await (mockIDRXContract as any).allowance(buyerAddress, wallet.address);
-    console.log("Buyer allowance to backend:", allowance.toString());
     if (allowance < priceWei) {
-      throw new Error(`Insufficient allowance. Has: ${allowance.toString()}, Needs: ${priceWei.toString()}`);
+      throw new Error(
+        `Insufficient allowance. Has: ${allowance.toString()}, Needs: ${priceWei.toString()}`
+      );
     }
 
-    // Verify buyer balance
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const buyerBalance = await (mockIDRXContract as any).balanceOf(buyerAddress);
-    console.log("Buyer IDRX balance:", buyerBalance.toString());
     if (buyerBalance < priceWei) {
-      throw new Error(`Insufficient balance. Has: ${buyerBalance.toString()}, Needs: ${priceWei.toString()}`);
+      throw new Error(
+        `Insufficient balance. Has: ${buyerBalance.toString()}, Needs: ${priceWei.toString()}`
+      );
     }
 
-    // Step 1: Transfer IDRX from buyer to seller
-    console.log(`Transferring ${price} IDRX from ${buyerAddress} to ${sellerAddress}...`);
+    // Transfer IDRX from buyer to seller
     try {
-      // CRITICAL FIX: Explicitly fetch nonce to prevent nonce conflicts
       if (!wallet.provider) {
         throw new Error("Wallet provider not initialized");
       }
-      const nonce1 = await wallet.provider.getTransactionCount(wallet.address, 'pending');
-      console.log(`[IDRX Transfer] Using nonce: ${nonce1}`);
+      const nonce1 = await wallet.provider.getTransactionCount(wallet.address, "pending");
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const idrxTx = await (mockIDRXContract as any).transferFrom(
@@ -126,68 +105,47 @@ export async function executePurchase(
         priceWei,
         { nonce: nonce1 }
       );
-      console.log("IDRX transfer tx sent:", idrxTx.hash);
-      const idrxReceipt = await idrxTx.wait();
-      console.log(`IDRX transfer confirmed. Gas used: ${idrxReceipt.gasUsed.toString()}`);
+      await idrxTx.wait();
     } catch (error) {
-      console.error("IDRX transfer failed:", error);
-      throw new Error(`IDRX transfer failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+      throw new Error(
+        `IDRX transfer failed: ${error instanceof Error ? error.message : "Unknown error"}`
+      );
     }
 
-    // Step 2: Transfer car from seller to buyer
-    console.log(`Transferring car tokenId ${tokenId} from ${sellerAddress} to ${buyerAddress}...`);
-
-    // Verify car ownership before transfer
+    // Transfer car from seller to buyer
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const currentOwner = await (carContract as any).ownerOf(tokenId);
-    console.log("Current car owner:", currentOwner);
     if (currentOwner.toLowerCase() !== sellerAddress.toLowerCase()) {
       throw new Error(`Seller doesn't own the car. Current owner: ${currentOwner}`);
     }
 
-    // Verify car approval
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const approvedAddress = await (carContract as any).getApproved(tokenId);
-    console.log("Car approved to:", approvedAddress);
     if (approvedAddress.toLowerCase() !== wallet.address.toLowerCase()) {
       throw new Error(`Car not approved to backend wallet. Approved to: ${approvedAddress}`);
     }
 
     try {
-      // CRITICAL FIX: Fetch fresh nonce for second transaction
       if (!wallet.provider) {
         throw new Error("Wallet provider not initialized");
       }
-      const nonce2 = await wallet.provider.getTransactionCount(wallet.address, 'pending');
-      console.log(`[Car Transfer] Using nonce: ${nonce2}`);
+      const nonce2 = await wallet.provider.getTransactionCount(wallet.address, "pending");
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const carTx = await (carContract as any).transferFrom(
-        sellerAddress,
-        buyerAddress,
-        tokenId,
-        { nonce: nonce2 }
-      );
-      console.log("Car transfer tx sent:", carTx.hash);
+      const carTx = await (carContract as any).transferFrom(sellerAddress, buyerAddress, tokenId, {
+        nonce: nonce2,
+      });
       const carReceipt = await carTx.wait();
-      console.log(`Car transfer confirmed. Gas used: ${carReceipt.gasUsed.toString()}`);
-      console.log("=== executePurchase SUCCESS ===");
-
       return { txHash: carReceipt.hash };
     } catch (error) {
-      console.error("Car transfer failed:", error);
-      // CRITICAL: IDRX already transferred! Manual intervention may be needed
-      console.error("⚠️ CRITICAL: IDRX transfer succeeded but car transfer failed!");
-      console.error("⚠️ Buyer paid but didn't receive car. Manual fix required!");
-      throw new Error(`Car transfer failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+      console.error("CRITICAL: IDRX transferred but car transfer failed!");
+      throw new Error(
+        `Car transfer failed: ${error instanceof Error ? error.message : "Unknown error"}`
+      );
     }
   } catch (error) {
-    console.error("Execute purchase error:", error);
-    console.error("=== executePurchase FAILED ===");
     throw new Error(
-      `Failed to execute marketplace purchase on-chain: ${
-        error instanceof Error ? error.message : "Unknown error"
-      }`
+      `Failed to execute marketplace purchase: ${error instanceof Error ? error.message : "Unknown error"}`
     );
   }
 }
@@ -228,8 +186,7 @@ export async function verifyPurchaseTransaction(
         if (parsed && parsed.name === "Transfer") {
           const [, to, tokenId] = parsed.args;
           return (
-            to.toLowerCase() === expectedBuyer.toLowerCase() &&
-            Number(tokenId) === expectedTokenId
+            to.toLowerCase() === expectedBuyer.toLowerCase() && Number(tokenId) === expectedTokenId
           );
         }
       } catch {

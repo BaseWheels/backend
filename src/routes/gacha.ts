@@ -1,8 +1,20 @@
 import { Router, Request, Response } from "express";
 import { prisma } from "../lib/prisma";
 import { auth, AuthRequest } from "../middleware/auth";
-import { mintCar, mintFragment, getMockIDRXBalance, verifyTransferTransaction, verifyBurnTransaction } from "../blockchain/client";
-import { GACHA_BOXES, selectRandomReward, FRAGMENT_NAMES, CarReward, FragmentReward } from "../config/gacha";
+import {
+  mintCar,
+  mintFragment,
+  getMockIDRXBalance,
+  verifyTransferTransaction,
+  verifyBurnTransaction,
+} from "../blockchain/client";
+import {
+  GACHA_BOXES,
+  selectRandomReward,
+  FRAGMENT_NAMES,
+  CarReward,
+  FragmentReward,
+} from "../config/gacha";
 
 const router = Router();
 
@@ -40,21 +52,13 @@ router.post("/gacha/open", auth, async (req: Request, res: Response) => {
 
       // Try transfer verification first (new gasless method)
       try {
-        isValid = await verifyTransferTransaction(
-          paymentTxHash,
-          walletAddress,
-          gachaBox.costCoins
-        );
+        isValid = await verifyTransferTransaction(paymentTxHash, walletAddress, gachaBox.costCoins);
       } catch (transferError) {
         console.log("Transfer verification failed, trying burn verification...");
 
         // Fallback to burn verification (backward compatibility)
         try {
-          isValid = await verifyBurnTransaction(
-            paymentTxHash,
-            walletAddress,
-            gachaBox.costCoins
-          );
+          isValid = await verifyBurnTransaction(paymentTxHash, walletAddress, gachaBox.costCoins);
         } catch (burnError) {
           throw transferError; // Throw original transfer error
         }
@@ -91,7 +95,9 @@ router.post("/gacha/open", auth, async (req: Request, res: Response) => {
         txHash = result.txHash;
       } catch (error) {
         console.error("Blockchain mint failed:", error);
-        console.error(`CRITICAL: User ${walletAddress} paid ${gachaBox.costCoins} IDRX but mint failed!`);
+        console.error(
+          `CRITICAL: User ${walletAddress} paid ${gachaBox.costCoins} IDRX but mint failed!`
+        );
         console.error(`Payment TX: ${paymentTxHash}`);
         res.status(500).json({
           error: "Failed to mint Car NFT on blockchain",
@@ -124,10 +130,16 @@ router.post("/gacha/open", auth, async (req: Request, res: Response) => {
       // Mint Fragment
       const fragmentReward = reward as FragmentReward;
       try {
-        txHash = await mintFragment(walletAddress, fragmentReward.fragmentType, fragmentReward.amount);
+        txHash = await mintFragment(
+          walletAddress,
+          fragmentReward.fragmentType,
+          fragmentReward.amount
+        );
       } catch (error) {
         console.error("Blockchain mint failed:", error);
-        console.error(`CRITICAL: User ${walletAddress} paid ${gachaBox.costCoins} IDRX but fragment mint failed!`);
+        console.error(
+          `CRITICAL: User ${walletAddress} paid ${gachaBox.costCoins} IDRX but fragment mint failed!`
+        );
         console.error(`Payment TX: ${paymentTxHash}`);
         res.status(500).json({
           error: "Failed to mint Fragment on blockchain",
@@ -168,9 +180,10 @@ router.post("/gacha/open", auth, async (req: Request, res: Response) => {
     const updatedBalance = await getMockIDRXBalance(walletAddress);
 
     // 8. Build success message
-    const message = reward.rewardType === "car"
-      ? `Congratulations! You got a ${reward.rarity} ${(reward as CarReward).modelName}!`
-      : `Congratulations! You got ${(reward as FragmentReward).amount}x ${reward.rarity} ${(reward as FragmentReward).brand} ${FRAGMENT_NAMES[(reward as FragmentReward).fragmentType]} Fragment!`;
+    const message =
+      reward.rewardType === "car"
+        ? `Congratulations! You got a ${reward.rarity} ${(reward as CarReward).modelName}!`
+        : `Congratulations! You got ${(reward as FragmentReward).amount}x ${reward.rarity} ${(reward as FragmentReward).brand} ${FRAGMENT_NAMES[(reward as FragmentReward).fragmentType]} Fragment!`;
 
     // 9. Return success response
     res.status(200).json({

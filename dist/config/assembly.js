@@ -17,7 +17,12 @@ exports.ASSEMBLED_CARS = [
     { modelName: "Toyota Supra MK4", series: "JDM Legend", rarity: "rare", probability: 20 },
     { modelName: "Mazda RX-7 FD", series: "JDM Legend", rarity: "rare", probability: 15 },
     // Epic tier (30% total)
-    { modelName: "Porsche 911 Turbo S", series: "German Engineering", rarity: "epic", probability: 15 },
+    {
+        modelName: "Porsche 911 Turbo S",
+        series: "German Engineering",
+        rarity: "epic",
+        probability: 15,
+    },
     { modelName: "BMW M5 CS", series: "German Engineering", rarity: "epic", probability: 10 },
     { modelName: "Audi RS6 Avant", series: "German Engineering", rarity: "epic", probability: 5 },
     // Legendary tier (10% total)

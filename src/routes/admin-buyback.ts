@@ -88,11 +88,7 @@ router.post("/admin-buyback/sell", auth, async (req: Request, res: Response) => 
     let nftTxHash: string;
     let idrxTxHash: string;
     try {
-      const result = await executeAdminBuyback(
-        walletAddress as string,
-        tokenId,
-        buybackPrice
-      );
+      const result = await executeAdminBuyback(walletAddress as string, tokenId, buybackPrice);
       nftTxHash = result.nftTxHash;
       idrxTxHash = result.idrxTxHash;
     } catch (error) {

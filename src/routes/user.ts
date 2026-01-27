@@ -161,7 +161,7 @@ router.post("/user/set-username", auth, async (req: Request, res: Response) => {
     // Validate alphanumeric (allow underscores)
     if (!/^[a-zA-Z0-9_]+$/.test(trimmedUsername)) {
       res.status(400).json({
-        error: "Username can only contain letters, numbers, and underscores"
+        error: "Username can only contain letters, numbers, and underscores",
       });
       return;
     }

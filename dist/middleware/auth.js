@@ -19,7 +19,7 @@ async function auth(req, res, next) {
         const claims = await privy.verifyAuthToken(token);
         const user = await privy.getUser(claims.userId);
         // Get embedded wallet info
-        const embeddedWallet = user.linkedAccounts?.find((account) => account.type === 'wallet' && account.walletClientType === 'privy');
+        const embeddedWallet = user.linkedAccounts?.find((account) => account.type === "wallet" && account.walletClientType === "privy");
         const walletAddress = embeddedWallet?.address || user.wallet?.address;
         const walletId = embeddedWallet?.id; // Privy's internal wallet ID (NOT the blockchain address!)
         if (!walletAddress) {
@@ -37,7 +37,7 @@ async function auth(req, res, next) {
             username = user.discord.username || null;
         }
         else if (email) {
-            username = email.split('@')[0] || null;
+            username = email.split("@")[0] || null;
         }
         // Check if user already exists
         const existingUser = await prisma_1.prisma.user.findUnique({

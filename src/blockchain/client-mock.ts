@@ -14,7 +14,7 @@ export async function mintFragment(
   console.log(`🎭 MOCK: Minting ${amount}x Fragment type ${fragmentType} to ${toAddress}`);
 
   // Simulate delay (like real blockchain)
-  await new Promise(resolve => setTimeout(resolve, 2000));
+  await new Promise((resolve) => setTimeout(resolve, 2000));
 
   // Return fake transaction hash
   const fakeTxHash = `0xMOCK${Date.now()}${Math.random().toString(36).substring(2, 15)}`;
@@ -37,7 +37,7 @@ export async function mintCar(
   console.log(`   - Model: ${modelName} (${series})`);
 
   // Simulate delay (like real blockchain)
-  await new Promise(resolve => setTimeout(resolve, 3000));
+  await new Promise((resolve) => setTimeout(resolve, 3000));
 
   // Return fake transaction hash
   const fakeTxHash = `0xMOCK${Date.now()}${Math.random().toString(36).substring(2, 15)}`;
@@ -66,7 +66,7 @@ export async function burnForAssembly(fromAddress: string): Promise<string> {
   console.log(`🎭 MOCK: Burning fragments from ${fromAddress}`);
 
   // Simulate delay
-  await new Promise(resolve => setTimeout(resolve, 2000));
+  await new Promise((resolve) => setTimeout(resolve, 2000));
 
   const fakeTxHash = `0xMOCK${Date.now()}${Math.random().toString(36).substring(2, 15)}`;
   console.log(`✅ MOCK: Fragments burned! TX: ${fakeTxHash}`);

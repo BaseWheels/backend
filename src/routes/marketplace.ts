@@ -80,7 +80,9 @@ router.post("/marketplace/list", auth, async (req: Request, res: Response) => {
     // 4. Delete old listing if exists (to handle cancelled/completed listings)
     // This is needed because carTokenId has a unique constraint
     if (car.listing) {
-      console.log(`[createListing] Deleting old listing ${car.listing.id} with status ${car.listing.status}`);
+      console.log(
+        `[createListing] Deleting old listing ${car.listing.id} with status ${car.listing.status}`
+      );
       await prisma.listing.delete({
         where: { id: car.listing.id },
       });

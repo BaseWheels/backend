@@ -7,10 +7,10 @@
  */
 
 export const SERIES_MAX_SUPPLY: Record<string, number> = {
-  "Economy": 100,     // 100 physical Economy cars available
-  "Sport": 50,        // 50 physical Sport cars available
-  "Supercar": 20,     // 20 physical Supercar cars available
-  "Hypercar": 10,     // 10 physical Hypercar cars available
+  Economy: 100, // 100 physical Economy cars available
+  Sport: 50, // 50 physical Sport cars available
+  Supercar: 20, // 20 physical Supercar cars available
+  Hypercar: 10, // 10 physical Hypercar cars available
 };
 
 /**
@@ -18,10 +18,10 @@ export const SERIES_MAX_SUPPLY: Record<string, number> = {
  * when a series is sold out
  */
 export const SERIES_REFUND_BONUS: Record<string, number> = {
-  "Economy": 500000,      // 500k IDRX bonus for Economy fragments
-  "Sport": 1000000,       // 1M IDRX bonus for Sport fragments
-  "Supercar": 2000000,    // 2M IDRX bonus for Supercar fragments
-  "Hypercar": 5000000,    // 5M IDRX bonus for Hypercar fragments
+  Economy: 500000, // 500k IDRX bonus for Economy fragments
+  Sport: 1000000, // 1M IDRX bonus for Sport fragments
+  Supercar: 2000000, // 2M IDRX bonus for Supercar fragments
+  Hypercar: 5000000, // 5M IDRX bonus for Hypercar fragments
 };
 
 /**

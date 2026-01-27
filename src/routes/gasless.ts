@@ -30,13 +30,13 @@ router.get("/gasless/server-wallet", async (_req: Request, res: Response) => {
     res.json({
       success: true,
       serverWallet: wallet.address,
-      message: "Users must approve this address to use gasless transactions"
+      message: "Users must approve this address to use gasless transactions",
     });
   } catch (error: any) {
     console.error("Get server wallet error:", error);
     res.status(500).json({
       error: "Failed to get server wallet",
-      details: error.message
+      details: error.message,
     });
   }
 });
@@ -59,7 +59,7 @@ router.post("/gasless/claim-faucet", auth, async (req: Request, res: Response) =
     // Check cooldown from database
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { lastFaucetClaim: true }
+      select: { lastFaucetClaim: true },
     });
 
     if (user?.lastFaucetClaim) {
@@ -73,7 +73,7 @@ router.post("/gasless/claim-faucet", auth, async (req: Request, res: Response) =
         return res.status(400).json({
           error: "Faucet cooldown active",
           details: `Cooldown aktif! Coba lagi dalam ${remainingHours} jam.`,
-          remainingSeconds: Math.ceil(remainingMs / 1000)
+          remainingSeconds: Math.ceil(remainingMs / 1000),
         });
       }
     }
@@ -84,7 +84,7 @@ router.post("/gasless/claim-faucet", auth, async (req: Request, res: Response) =
     // Update last claim time in database
     await prisma.user.update({
       where: { id: userId },
-      data: { lastFaucetClaim: new Date() }
+      data: { lastFaucetClaim: new Date() },
     });
 
     res.json({
@@ -103,7 +103,7 @@ router.post("/gasless/claim-faucet", auth, async (req: Request, res: Response) =
 
     res.status(500).json({
       error: errorMessage,
-      details: error.message
+      details: error.message,
     });
   }
 });
@@ -148,7 +148,7 @@ router.post("/gasless/approve-mockidrx", auth, async (req: Request, res: Respons
     console.error("Approve MockIDRX relay error:", error);
     res.status(500).json({
       error: "Failed to approve MockIDRX",
-      details: error.message
+      details: error.message,
     });
   }
 });
@@ -176,7 +176,9 @@ router.post("/gasless/pay-for-spin", auth, async (req: Request, res: Response) =
     // Convert amount to token units (MockIDRXv2 has 2 decimals)
     const amountWei = ethers.parseUnits(amount.toString(), 2);
 
-    console.log(`[payForSpin] Server calling payForSpinOnBehalfOf for user ${walletAddress}, amount: ${amount}`);
+    console.log(
+      `[payForSpin] Server calling payForSpinOnBehalfOf for user ${walletAddress}, amount: ${amount}`
+    );
 
     // Server wallet calls payForSpinOnBehalfOf (server pays gas!)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -195,15 +197,21 @@ router.post("/gasless/pay-for-spin", auth, async (req: Request, res: Response) =
     console.error("Pay for spin relay error:", error);
 
     let errorMessage = "Failed to pay for spin";
-    if (error.message?.includes("Insufficient balance") || error.message?.includes("insufficient balance")) {
+    if (
+      error.message?.includes("Insufficient balance") ||
+      error.message?.includes("insufficient balance")
+    ) {
       errorMessage = "Insufficient MockIDRX balance";
-    } else if (error.message?.includes("insufficient allowance") || error.message?.includes("not approved")) {
+    } else if (
+      error.message?.includes("insufficient allowance") ||
+      error.message?.includes("not approved")
+    ) {
       errorMessage = "Please approve server wallet first";
     }
 
     res.status(500).json({
       error: errorMessage,
-      details: error.message
+      details: error.message,
     });
   }
 });
@@ -254,7 +262,7 @@ router.post("/gasless/burn-mockidrx", auth, async (req: Request, res: Response) 
 
     res.status(500).json({
       error: errorMessage,
-      details: error.message
+      details: error.message,
     });
   }
 });
@@ -298,7 +306,7 @@ router.post("/gasless/approve-car-nft", auth, async (req: Request, res: Response
     console.error("Approve Car NFT relay error:", error);
     res.status(500).json({
       error: "Failed to approve Car NFT",
-      details: error.message
+      details: error.message,
     });
   }
 });

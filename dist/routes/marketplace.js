@@ -63,7 +63,15 @@ router.post("/marketplace/list", auth_1.auth, async (req, res) => {
             });
             return;
         }
-        // 4. Verify on-chain ownership
+        // 4. Delete old listing if exists (to handle cancelled/completed listings)
+        // This is needed because carTokenId has a unique constraint
+        if (car.listing) {
+            console.log(`[createListing] Deleting old listing ${car.listing.id} with status ${car.listing.status}`);
+            await prisma_1.prisma.listing.delete({
+                where: { id: car.listing.id },
+            });
+        }
+        // 5. Verify on-chain ownership
         const ownsOnChain = await (0, marketplace_client_1.verifyCarOwnership)(tokenId, walletAddress);
         if (!ownsOnChain) {
             res.status(400).json({
@@ -71,7 +79,7 @@ router.post("/marketplace/list", auth_1.auth, async (req, res) => {
             });
             return;
         }
-        // 5. Create listing
+        // 6. Create listing
         const listing = await prisma_1.prisma.listing.create({
             data: {
                 carTokenId: tokenId,
@@ -90,7 +98,7 @@ router.post("/marketplace/list", auth_1.auth, async (req, res) => {
                 },
             },
         });
-        // 6. Return success with approval instructions
+        // 7. Return success with approval instructions
         res.status(201).json({
             success: true,
             listing,

@@ -57,7 +57,8 @@ router.post("/check-in", auth, async (req: Request, res: Response) => {
     const mockIDRXReward = Math.floor(Math.random() * 41) + 10; // MockIDRX: 10-50
 
     // Randomly select fragment attributes from daily reward pool
-    const fragmentReward = DAILY_FRAGMENT_REWARDS[Math.floor(Math.random() * DAILY_FRAGMENT_REWARDS.length)]!;
+    const fragmentReward =
+      DAILY_FRAGMENT_REWARDS[Math.floor(Math.random() * DAILY_FRAGMENT_REWARDS.length)]!;
 
     // 4. Mint fragment on-chain
     let fragmentTxHash: string;

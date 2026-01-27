@@ -17,10 +17,10 @@ router.get("/garage/overview", auth_1.auth, async (req, res) => {
             where: { id: userId },
             include: {
                 cars: {
-                    orderBy: { tokenId: 'desc' },
+                    orderBy: { tokenId: "desc" },
                 },
                 fragments: {
-                    orderBy: { createdAt: 'desc' },
+                    orderBy: { createdAt: "desc" },
                 },
             },
         });
@@ -43,15 +43,9 @@ router.get("/garage/overview", auth_1.auth, async (req, res) => {
             return acc;
         }, {});
         // Fragment names
-        const fragmentNames = [
-            "Engine",
-            "Chassis",
-            "Wheels",
-            "Body",
-            "Electronics"
-        ];
+        const fragmentNames = ["Engine", "Chassis", "Wheels", "Body", "Electronics"];
         // Calculate rarity distribution (exclude redeemed cars)
-        const activeCars = user.cars.filter(car => !car.isRedeemed);
+        const activeCars = user.cars.filter((car) => !car.isRedeemed);
         const rarityCount = activeCars.reduce((acc, car) => {
             let rarity = "common";
             if (car.series?.includes("Hypercar") || car.series?.includes("Limited Edition")) {
@@ -90,17 +84,17 @@ router.get("/garage/overview", auth_1.auth, async (req, res) => {
                     count: fragmentCounts[i] || 0,
                 })),
                 canAssemble: Object.keys(fragmentCounts).length === 5 &&
-                    Object.values(fragmentCounts).every(count => count >= 1),
+                    Object.values(fragmentCounts).every((count) => count >= 1),
                 rarityDistribution: rarityCount,
             },
-            recentCars: activeCars.slice(0, 5).map(car => ({
+            recentCars: activeCars.slice(0, 5).map((car) => ({
                 tokenId: car.tokenId,
                 modelName: car.modelName,
                 series: car.series,
                 isRedeemed: car.isRedeemed,
                 mintTxHash: car.mintTxHash,
             })),
-            recentFragments: user.fragments.slice(0, 10).map(fragment => ({
+            recentFragments: user.fragments.slice(0, 10).map((fragment) => ({
                 id: fragment.id,
                 typeId: fragment.typeId,
                 typeName: fragmentNames[fragment.typeId],
@@ -130,21 +124,21 @@ router.get("/garage/cars", auth_1.auth, async (req, res) => {
         const totalCars = await prisma_1.prisma.car.count({
             where: {
                 ownerId: userId,
-                isRedeemed: false // Only count unredeemed cars
+                isRedeemed: false, // Only count unredeemed cars
             },
         });
         // Get paginated cars (only unredeemed cars)
         const cars = await prisma_1.prisma.car.findMany({
             where: {
                 ownerId: userId,
-                isRedeemed: false // Only show unredeemed cars
+                isRedeemed: false, // Only show unredeemed cars
             },
-            orderBy: { tokenId: 'desc' },
+            orderBy: { tokenId: "desc" },
             skip,
             take: limit,
         });
         // Enrich car data with metadata
-        const enrichedCars = cars.map(car => {
+        const enrichedCars = cars.map((car) => {
             // Determine rarity
             let rarity = "common";
             if (car.series?.includes("Hypercar") || car.series?.includes("Limited Edition")) {
@@ -195,7 +189,7 @@ router.get("/garage/fragments", auth_1.auth, async (req, res) => {
         // Get all unused fragments
         const fragments = await prisma_1.prisma.fragment.findMany({
             where: { userId, isUsed: false },
-            orderBy: { createdAt: 'desc' },
+            orderBy: { createdAt: "desc" },
         });
         const fragmentTypeNames = {
             0: "Chassis",
@@ -206,7 +200,7 @@ router.get("/garage/fragments", auth_1.auth, async (req, res) => {
         };
         // Group fragments by brand
         const fragmentsByBrand = {};
-        fragments.forEach(fragment => {
+        fragments.forEach((fragment) => {
             const key = fragment.brand;
             if (!fragmentsByBrand[key]) {
                 fragmentsByBrand[key] = {
@@ -219,7 +213,7 @@ router.get("/garage/fragments", auth_1.auth, async (req, res) => {
                 };
             }
             // Find or create fragment type entry
-            let typeEntry = fragmentsByBrand[key].fragments.find(f => f.typeId === fragment.typeId);
+            let typeEntry = fragmentsByBrand[key].fragments.find((f) => f.typeId === fragment.typeId);
             if (!typeEntry) {
                 typeEntry = {
                     typeId: fragment.typeId,
@@ -233,10 +227,10 @@ router.get("/garage/fragments", auth_1.auth, async (req, res) => {
             typeEntry.ids.push(fragment.id);
         });
         // Calculate canAssemble and totalParts for each brand
-        Object.values(fragmentsByBrand).forEach(brandData => {
+        Object.values(fragmentsByBrand).forEach((brandData) => {
             brandData.totalParts = brandData.fragments.reduce((sum, f) => sum + f.count, 0);
             // Check if has all 5 unique fragment types (0-4)
-            const uniqueTypes = new Set(brandData.fragments.map(f => f.typeId));
+            const uniqueTypes = new Set(brandData.fragments.map((f) => f.typeId));
             brandData.canAssemble = uniqueTypes.size === 5;
             // Sort fragments by typeId
             brandData.fragments.sort((a, b) => a.typeId - b.typeId);
@@ -248,7 +242,7 @@ router.get("/garage/fragments", auth_1.auth, async (req, res) => {
             return b.totalParts - a.totalParts;
         });
         // Find brands that can be assembled
-        const assemblableBrands = inventory.filter(b => b.canAssemble).map(b => b.brand);
+        const assemblableBrands = inventory.filter((b) => b.canAssemble).map((b) => b.brand);
         res.status(200).json({
             inventory,
             summary: {

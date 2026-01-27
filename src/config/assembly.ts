@@ -21,7 +21,12 @@ export const ASSEMBLED_CARS: AssembledCar[] = [
   { modelName: "Mazda RX-7 FD", series: "JDM Legend", rarity: "rare", probability: 15 },
 
   // Epic tier (30% total)
-  { modelName: "Porsche 911 Turbo S", series: "German Engineering", rarity: "epic", probability: 15 },
+  {
+    modelName: "Porsche 911 Turbo S",
+    series: "German Engineering",
+    rarity: "epic",
+    probability: 15,
+  },
   { modelName: "BMW M5 CS", series: "German Engineering", rarity: "epic", probability: 10 },
   { modelName: "Audi RS6 Avant", series: "German Engineering", rarity: "epic", probability: 5 },
 

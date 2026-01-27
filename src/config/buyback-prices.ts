@@ -4,10 +4,10 @@
  */
 
 export const BUYBACK_PRICES = {
-  common: 150000,      // 150k IDRX
-  rare: 300000,        // 300k IDRX
-  epic: 600000,        // 600k IDRX
-  legendary: 1200000   // 1.2M IDRX
+  common: 150000, // 150k IDRX
+  rare: 300000, // 300k IDRX
+  epic: 600000, // 600k IDRX
+  legendary: 1200000, // 1.2M IDRX
 } as const;
 
 export type Rarity = keyof typeof BUYBACK_PRICES;

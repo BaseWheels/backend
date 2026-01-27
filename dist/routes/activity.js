@@ -12,7 +12,7 @@ router.get("/activity/recent", auth_1.auth, async (_req, res) => {
     try {
         // Fetch recent minted cars (last 20)
         const recentMints = await prisma_1.prisma.car.findMany({
-            orderBy: { createdAt: 'desc' },
+            orderBy: { createdAt: "desc" },
             take: 20,
             include: {
                 user: {
@@ -20,14 +20,14 @@ router.get("/activity/recent", auth_1.auth, async (_req, res) => {
                         walletAddress: true,
                         username: true,
                         email: true,
-                    }
-                }
-            }
+                    },
+                },
+            },
         });
         // Fetch recent redeemed cars (last 20)
         const recentRedeems = await prisma_1.prisma.car.findMany({
             where: { isRedeemed: true },
-            orderBy: { redeemedAt: 'desc' },
+            orderBy: { redeemedAt: "desc" },
             take: 20,
             include: {
                 user: {
@@ -35,17 +35,17 @@ router.get("/activity/recent", auth_1.auth, async (_req, res) => {
                         walletAddress: true,
                         username: true,
                         email: true,
-                    }
-                }
-            }
+                    },
+                },
+            },
         });
         // Fetch recent admin buybacks (last 20) with original seller info
         const recentBuybacks = await prisma_1.prisma.car.findMany({
             where: {
                 soldToAdminAt: { not: null },
-                soldByUserId: { not: null } // Only show buybacks with tracked seller
+                soldByUserId: { not: null }, // Only show buybacks with tracked seller
             },
-            orderBy: { soldToAdminAt: 'desc' },
+            orderBy: { soldToAdminAt: "desc" },
             take: 20,
         });
         // For each buyback, fetch the original seller info separately
@@ -58,21 +58,21 @@ router.get("/activity/recent", auth_1.auth, async (_req, res) => {
                     walletAddress: true,
                     username: true,
                     email: true,
-                }
+                },
             });
             return { car, seller };
         }));
         // Transform to activity format
-        const mintActivities = recentMints.map(car => {
+        const mintActivities = recentMints.map((car) => {
             // Use username/email if available, otherwise wallet address
             const displayName = car.user.username ||
                 car.user.email ||
                 `${car.user.walletAddress.slice(0, 6)}...${car.user.walletAddress.slice(-4)}`;
             return {
                 id: `mint-${car.tokenId}`,
-                type: 'mint',
+                type: "mint",
                 user: displayName,
-                action: `minted ${car.series || 'a'} NFT`,
+                action: `minted ${car.series || "a"} NFT`,
                 carModel: car.modelName,
                 series: car.series,
                 timestamp: car.createdAt,
@@ -80,26 +80,26 @@ router.get("/activity/recent", auth_1.auth, async (_req, res) => {
             };
         });
         const redeemActivities = recentRedeems
-            .filter(car => car.redeemedAt) // Only include cars with redeemedAt
-            .map(car => {
+            .filter((car) => car.redeemedAt) // Only include cars with redeemedAt
+            .map((car) => {
             // Use username/email if available, otherwise wallet address
             const displayName = car.user.username ||
                 car.user.email ||
                 `${car.user.walletAddress.slice(0, 6)}...${car.user.walletAddress.slice(-4)}`;
             return {
                 id: `redeem-${car.tokenId}`,
-                type: 'redeem',
+                type: "redeem",
                 user: displayName,
-                action: `claimed physical ${car.series || ''} car`,
+                action: `claimed physical ${car.series || ""} car`,
                 carModel: car.modelName,
                 series: car.series,
                 timestamp: car.redeemedAt,
-                avatar: '🔥',
+                avatar: "🔥",
             };
         });
         const buybackActivities = buybacksWithSeller
-            .filter(item => item !== null && item.seller && item.car.soldToAdminAt)
-            .map(item => {
+            .filter((item) => item !== null && item.seller && item.car.soldToAdminAt)
+            .map((item) => {
             const { car, seller } = item;
             // Use username/email if available, otherwise wallet address
             const displayName = seller.username ||
@@ -107,13 +107,13 @@ router.get("/activity/recent", auth_1.auth, async (_req, res) => {
                 `${seller.walletAddress.slice(0, 6)}...${seller.walletAddress.slice(-4)}`;
             return {
                 id: `buyback-${car.tokenId}`,
-                type: 'buyback',
+                type: "buyback",
                 user: displayName,
-                action: `sold ${car.series || 'a'} car to admin`,
+                action: `sold ${car.series || "a"} car to admin`,
                 carModel: car.modelName,
                 series: car.series,
                 timestamp: car.soldToAdminAt,
-                avatar: '💰',
+                avatar: "💰",
                 verified: true, // ✓ Verified badge for official admin buyback
             };
         });
@@ -122,7 +122,7 @@ router.get("/activity/recent", auth_1.auth, async (_req, res) => {
             .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
             .slice(0, 15); // Return top 15 activities
         // Format timestamps to relative time
-        const formattedActivities = allActivities.map(activity => ({
+        const formattedActivities = allActivities.map((activity) => ({
             ...activity,
             time: getRelativeTime(new Date(activity.timestamp)),
         }));
@@ -149,106 +149,103 @@ router.get("/activity/history", auth_1.auth, async (req, res) => {
         // Include cars currently owned AND cars sold to admin (so mint history doesn't disappear after selling)
         const userMints = await prisma_1.prisma.car.findMany({
             where: {
-                OR: [
-                    { ownerId: userId },
-                    { soldByUserId: userId, soldToAdminAt: { not: null } }
-                ]
+                OR: [{ ownerId: userId }, { soldByUserId: userId, soldToAdminAt: { not: null } }],
             },
-            orderBy: { createdAt: 'desc' },
+            orderBy: { createdAt: "desc" },
             take: 50,
         });
         // Fetch user's redeemed cars
         const userRedeems = await prisma_1.prisma.car.findMany({
             where: {
                 ownerId: userId,
-                isRedeemed: true
+                isRedeemed: true,
             },
-            orderBy: { redeemedAt: 'desc' },
+            orderBy: { redeemedAt: "desc" },
             take: 50,
         });
         // Fetch marketplace listings created by user (sold by user)
         const userListings = await prisma_1.prisma.listing.findMany({
             where: { sellerId: userId },
-            orderBy: { createdAt: 'desc' },
+            orderBy: { createdAt: "desc" },
             take: 50,
             include: {
-                car: true
-            }
+                car: true,
+            },
         });
         // Fetch marketplace purchases by user (bought by user)
         const userPurchases = await prisma_1.prisma.listing.findMany({
             where: {
                 buyerId: userId,
-                status: 'sold'
+                status: "sold",
             },
-            orderBy: { soldAt: 'desc' },
+            orderBy: { soldAt: "desc" },
             take: 50,
             include: {
-                car: true
-            }
+                car: true,
+            },
         });
         // Transform to activity format
         const activities = [];
         // Mint activities (Gacha wins)
-        userMints.forEach(car => {
+        userMints.forEach((car) => {
             activities.push({
                 id: `mint-${car.tokenId}`,
-                type: 'gacha',
-                action: 'Won from Gacha',
+                type: "gacha",
+                action: "Won from Gacha",
                 carModel: car.modelName,
                 series: car.series,
                 rarity: determineRarity(car.series),
                 tokenId: car.tokenId,
                 txHash: car.mintTxHash,
                 timestamp: car.createdAt,
-                icon: '🎰',
+                icon: "🎰",
             });
         });
         // Redeem activities
-        userRedeems.forEach(car => {
+        userRedeems.forEach((car) => {
             if (car.redeemedAt) {
                 activities.push({
                     id: `redeem-${car.tokenId}`,
-                    type: 'redeem',
-                    action: 'Claimed Physical Car',
+                    type: "redeem",
+                    action: "Claimed Physical Car",
                     carModel: car.modelName,
                     series: car.series,
                     rarity: determineRarity(car.series),
                     tokenId: car.tokenId,
                     timestamp: car.redeemedAt,
-                    icon: '📦',
+                    icon: "📦",
                 });
             }
         });
         // Marketplace listing activities (selling)
         userListings.forEach((listing) => {
-            const isSold = listing.status === 'sold';
+            const isSold = listing.status === "sold";
             activities.push({
                 id: `list-${listing.id}`,
-                type: isSold ? 'sold' : 'listed',
-                action: isSold ? 'Sold on Marketplace' : 'Listed on Marketplace',
+                type: isSold ? "sold" : "listed",
+                action: isSold ? "Sold on Marketplace" : "Listed on Marketplace",
                 carModel: listing.car.modelName,
                 series: listing.car.series,
                 rarity: determineRarity(listing.car.series),
                 tokenId: listing.car.tokenId,
                 price: listing.price,
                 timestamp: isSold && listing.soldAt ? listing.soldAt : listing.createdAt,
-                icon: isSold ? '💰' : '🏷️',
+                icon: isSold ? "💰" : "🏷️",
             });
         });
         // Marketplace purchase activities (buying)
         userPurchases.forEach((listing) => {
             activities.push({
                 id: `buy-${listing.id}`,
-                type: 'purchased',
-                action: 'Purchased from Marketplace',
+                type: "purchased",
+                action: "Purchased from Marketplace",
                 carModel: listing.car.modelName,
                 series: listing.car.series,
                 rarity: determineRarity(listing.car.series),
                 tokenId: listing.car.tokenId,
                 price: listing.price,
                 timestamp: listing.soldAt || listing.updatedAt,
-                icon: '🛒',
+                icon: "🛒",
             });
         });
         // Fetch user's admin buyback transactions
@@ -257,22 +254,22 @@ router.get("/activity/history", auth_1.auth, async (req, res) => {
                 soldToAdminAt: { not: null },
                 soldByUserId: userId, // Only show buybacks where this user was the seller
             },
-            orderBy: { soldToAdminAt: 'desc' },
+            orderBy: { soldToAdminAt: "desc" },
             take: 50,
         });
         // Admin buyback activities
-        userBuybacks.forEach(car => {
+        userBuybacks.forEach((car) => {
             if (car.soldToAdminAt) {
                 activities.push({
                     id: `buyback-${car.tokenId}`,
-                    type: 'buyback',
-                    action: 'Sold to Admin',
+                    type: "buyback",
+                    action: "Sold to Admin",
                     carModel: car.modelName,
                     series: car.series,
                     rarity: determineRarity(car.series),
                     tokenId: car.tokenId,
                     timestamp: car.soldToAdminAt,
-                    icon: '💰',
+                    icon: "💰",
                 });
             }
         });
@@ -282,12 +279,12 @@ router.get("/activity/history", auth_1.auth, async (req, res) => {
                 userId,
                 isUsed: true,
             },
-            orderBy: { createdAt: 'desc' },
+            orderBy: { createdAt: "desc" },
             take: 50,
         });
         // Group assembled fragments by brand and approximate assembly time
         const assembledByBrandTime = {};
-        userAssembledCars.forEach(fragment => {
+        userAssembledCars.forEach((fragment) => {
             const timeKey = Math.floor(fragment.createdAt.getTime() / 60000); // Round to minute
             const key = `${fragment.brand}-${timeKey}`;
             if (!assembledByBrandTime[key]) {
@@ -305,13 +302,13 @@ router.get("/activity/history", auth_1.auth, async (req, res) => {
             if (assembly.count >= 5) {
                 activities.push({
                     id: `assembly-${assembly.brand}-${assembly.timestamp.getTime()}`,
-                    type: 'assembly',
-                    action: 'Assembled Car',
+                    type: "assembly",
+                    action: "Assembled Car",
                     carModel: assembly.brand,
                     series: assembly.series,
                     rarity: determineRarity(assembly.series),
                     timestamp: assembly.timestamp,
-                    icon: '🔧',
+                    icon: "🔧",
                 });
             }
         });
@@ -320,7 +317,7 @@ router.get("/activity/history", auth_1.auth, async (req, res) => {
             .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
             .slice(0, 50); // Limit to 50 most recent
         // Format timestamps
-        const formattedActivities = sortedActivities.map(activity => ({
+        const formattedActivities = sortedActivities.map((activity) => ({
             ...activity,
             time: getRelativeTime(new Date(activity.timestamp)),
             date: new Date(activity.timestamp).toLocaleDateString(),
@@ -332,11 +329,12 @@ router.get("/activity/history", auth_1.auth, async (req, res) => {
                 totalMints: userMints.length,
                 totalRedeems: userRedeems.length,
                 totalListings: userListings.length,
-                totalSales: userListings.filter((l) => l.status === 'sold').length,
+                totalSales: userListings.filter((l) => l.status === "sold").length,
                 totalPurchases: userPurchases.length,
                 totalBuybacks: userBuybacks.length,
-                totalAssemblies: Object.values(assembledByBrandTime).filter((a) => a.count >= 5).length,
-            }
+                totalAssemblies: Object.values(assembledByBrandTime).filter((a) => a.count >= 5)
+                    .length,
+            },
         });
     }
     catch (error) {
@@ -351,37 +349,37 @@ router.get("/activity/history", auth_1.auth, async (req, res) => {
  */
 function determineRarity(series) {
     if (!series)
-        return 'common';
-    if (series.includes('Hypercar') || series.includes('Limited Edition')) {
-        return 'legendary';
+        return "common";
+    if (series.includes("Hypercar") || series.includes("Limited Edition")) {
+        return "legendary";
     }
-    else if (series.includes('German Engineering') || series.includes('Supercar')) {
-        return 'epic';
+    else if (series.includes("German Engineering") || series.includes("Supercar")) {
+        return "epic";
     }
-    else if (series.includes('JDM Legend') || series.includes('Sport')) {
-        return 'rare';
+    else if (series.includes("JDM Legend") || series.includes("Sport")) {
+        return "rare";
     }
-    else if (series.includes('Uncommon')) {
-        return 'uncommon';
+    else if (series.includes("Uncommon")) {
+        return "uncommon";
     }
-    return 'common';
+    return "common";
 }
 /**
  * Helper: Get emoji based on series
  */
 function getSeriesEmoji(series) {
     if (!series)
-        return '🚗';
+        return "🚗";
     const seriesLower = series.toLowerCase();
-    if (seriesLower.includes('hypercar'))
-        return '🏎️';
-    if (seriesLower.includes('supercar'))
-        return '🚀';
-    if (seriesLower.includes('sport'))
-        return '🏁';
-    if (seriesLower.includes('economy'))
-        return '🚙';
-    return '🚗';
+    if (seriesLower.includes("hypercar"))
+        return "🏎️";
+    if (seriesLower.includes("supercar"))
+        return "🚀";
+    if (seriesLower.includes("sport"))
+        return "🏁";
+    if (seriesLower.includes("economy"))
+        return "🚙";
+    return "🚗";
 }
 /**
  * Helper: Get relative time string
@@ -393,7 +391,7 @@ function getRelativeTime(date) {
     const diffHours = Math.floor(diffMs / 3600000);
     const diffDays = Math.floor(diffMs / 86400000);
     if (diffMins < 1)
-        return 'just now';
+        return "just now";
     if (diffMins < 60)
         return `${diffMins}m ago`;
     if (diffHours < 24)

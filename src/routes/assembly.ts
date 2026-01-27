@@ -38,19 +38,21 @@ router.post("/assembly/forge", auth, async (req: Request, res: Response) => {
 
     // Group by typeId and check all 5 types exist
     const fragmentsByType: Record<number, { id: number }[]> = {};
-    userFragments.forEach(f => {
+    userFragments.forEach((f) => {
       if (!fragmentsByType[f.typeId]) fragmentsByType[f.typeId] = [];
       fragmentsByType[f.typeId]!.push({ id: f.id });
     });
 
-    const hasAllTypes = [0, 1, 2, 3, 4].every(typeId => (fragmentsByType[typeId]?.length ?? 0) >= 1);
+    const hasAllTypes = [0, 1, 2, 3, 4].every(
+      (typeId) => (fragmentsByType[typeId]?.length ?? 0) >= 1
+    );
 
     if (!hasAllTypes) {
-      const missingTypes = [0, 1, 2, 3, 4].filter(t => !fragmentsByType[t]?.length);
+      const missingTypes = [0, 1, 2, 3, 4].filter((t) => !fragmentsByType[t]?.length);
       const typeNames = ["Chassis", "Wheels", "Engine", "Body", "Interior"];
       res.status(400).json({
         error: "Insufficient fragments",
-        message: `Missing fragments for ${brand}: ${missingTypes.map(t => typeNames[t]).join(", ")}`,
+        message: `Missing fragments for ${brand}: ${missingTypes.map((t) => typeNames[t]).join(", ")}`,
         missingTypes,
       });
       return;
@@ -83,7 +85,7 @@ router.post("/assembly/forge", auth, async (req: Request, res: Response) => {
     const carRarity = firstFragment.rarity;
 
     // 5.5. Prepare fragment IDs for assembly
-    const fragmentIdsToUse = [0, 1, 2, 3, 4].map(typeId => fragmentsByType[typeId]![0]!.id);
+    const fragmentIdsToUse = [0, 1, 2, 3, 4].map((typeId) => fragmentsByType[typeId]![0]!.id);
 
     // 5.6. Check supply cap (RWA management)
     const currentMinted = await prisma.car.count({
@@ -157,7 +159,9 @@ router.post("/assembly/forge", auth, async (req: Request, res: Response) => {
     } catch (error) {
       console.error("Failed to mint car:", error);
       // CRITICAL: Fragments already burned! Log this for manual recovery
-      console.error(`CRITICAL: User ${walletAddress} burned fragments for ${brand} but mint failed!`);
+      console.error(
+        `CRITICAL: User ${walletAddress} burned fragments for ${brand} but mint failed!`
+      );
       console.error(`Burn TX: ${burnTxHash}`);
       console.error(`Fragment IDs used: ${fragmentIdsToUse.join(", ")}`);
 
@@ -217,7 +221,7 @@ router.get("/assembly/can-forge", auth, async (req: Request, res: Response) => {
 
     // Group by brand
     const fragmentsByBrand: Record<string, Set<number>> = {};
-    fragments.forEach(f => {
+    fragments.forEach((f) => {
       if (!fragmentsByBrand[f.brand]) fragmentsByBrand[f.brand] = new Set();
       fragmentsByBrand[f.brand]!.add(f.typeId);
     });
@@ -239,9 +243,10 @@ router.get("/assembly/can-forge", auth, async (req: Request, res: Response) => {
       canForge: assemblableBrands.length > 0 && hasAllPartsOnChain,
       assemblableBrands,
       hasOnChainFragments: hasAllPartsOnChain,
-      message: assemblableBrands.length > 0
-        ? `You can assemble: ${assemblableBrands.join(", ")}`
-        : "Collect all 5 fragment types of the same brand to assemble",
+      message:
+        assemblableBrands.length > 0
+          ? `You can assemble: ${assemblableBrands.join(", ")}`
+          : "Collect all 5 fragment types of the same brand to assemble",
     });
   } catch (error) {
     console.error("Can forge check error:", error);

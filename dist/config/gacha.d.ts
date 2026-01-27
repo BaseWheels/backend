@@ -9,7 +9,7 @@ export declare const FRAGMENT_TYPES: {
     readonly BODY: 3;
     readonly INTERIOR: 4;
 };
-export type FragmentType = typeof FRAGMENT_TYPES[keyof typeof FRAGMENT_TYPES];
+export type FragmentType = (typeof FRAGMENT_TYPES)[keyof typeof FRAGMENT_TYPES];
 export declare const FRAGMENT_NAMES: Record<FragmentType, string>;
 interface BaseReward {
     rarity: "common" | "rare" | "epic" | "legendary";

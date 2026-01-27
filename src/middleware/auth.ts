@@ -17,11 +17,7 @@ export interface AuthRequest extends Request {
   walletId?: string; // Privy wallet ID for gasless transactions
 }
 
-export async function auth(
-  req: Request,
-  res: Response,
-  next: NextFunction
-): Promise<void> {
+export async function auth(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const token = req.headers.authorization?.replace("Bearer ", "");
 
@@ -35,7 +31,7 @@ export async function auth(
 
     // Get embedded wallet info
     const embeddedWallet = user.linkedAccounts?.find(
-      (account: any) => account.type === 'wallet' && account.walletClientType === 'privy'
+      (account: any) => account.type === "wallet" && account.walletClientType === "privy"
     ) as any;
 
     const walletAddress = embeddedWallet?.address || user.wallet?.address;
@@ -56,7 +52,7 @@ export async function auth(
     } else if (user.discord?.username) {
       username = user.discord.username || null;
     } else if (email) {
-      username = email.split('@')[0] || null;
+      username = email.split("@")[0] || null;
     }
 
     // Check if user already exists

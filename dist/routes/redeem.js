@@ -147,7 +147,7 @@ router.post("/redeem/claim-physical", auth_1.auth, async (req, res) => {
         });
         if (listing && listing.status === "active") {
             res.status(400).json({
-                error: "Cannot redeem NFT that is listed on marketplace. Please delist it first."
+                error: "Cannot redeem NFT that is listed on marketplace. Please delist it first.",
             });
             return;
         }
