@@ -112,11 +112,19 @@ export async function executePurchase(
     // Step 1: Transfer IDRX from buyer to seller
     console.log(`Transferring ${price} IDRX from ${buyerAddress} to ${sellerAddress}...`);
     try {
+      // CRITICAL FIX: Explicitly fetch nonce to prevent nonce conflicts
+      if (!wallet.provider) {
+        throw new Error("Wallet provider not initialized");
+      }
+      const nonce1 = await wallet.provider.getTransactionCount(wallet.address, 'pending');
+      console.log(`[IDRX Transfer] Using nonce: ${nonce1}`);
+
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const idrxTx = await (mockIDRXContract as any).transferFrom(
         buyerAddress,
         sellerAddress,
-        priceWei
+        priceWei,
+        { nonce: nonce1 }
       );
       console.log("IDRX transfer tx sent:", idrxTx.hash);
       const idrxReceipt = await idrxTx.wait();
@@ -146,11 +154,19 @@ export async function executePurchase(
     }
 
     try {
+      // CRITICAL FIX: Fetch fresh nonce for second transaction
+      if (!wallet.provider) {
+        throw new Error("Wallet provider not initialized");
+      }
+      const nonce2 = await wallet.provider.getTransactionCount(wallet.address, 'pending');
+      console.log(`[Car Transfer] Using nonce: ${nonce2}`);
+
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const carTx = await (carContract as any).transferFrom(
         sellerAddress,
         buyerAddress,
-        tokenId
+        tokenId,
+        { nonce: nonce2 }
       );
       console.log("Car transfer tx sent:", carTx.hash);
       const carReceipt = await carTx.wait();
