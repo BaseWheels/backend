@@ -44,6 +44,14 @@ app.use("/api", adminBuybackRoutes); // 💰 Admin buyback / Sell to Admin
 // Metadata Routes (for NFT marketplaces)
 app.use(metadataRoutes);
 
+// Global error handler
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  console.error('Unhandled error:', err);
+  res.status(500).json({
+    error: process.env.NODE_ENV === 'production' ? 'Internal server error' : err.message
+  });
+});
+
 // Start server
 app.listen(PORT, () => {
   console.log(`Backend running on port ${PORT}`);

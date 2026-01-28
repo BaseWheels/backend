@@ -42,6 +42,13 @@ app.use("/api", gasless_1.default); // 🔥 Gasless transaction relay
 app.use("/api", admin_buyback_1.default); // 💰 Admin buyback / Sell to Admin
 // Metadata Routes (for NFT marketplaces)
 app.use(metadata_1.default);
+// Global error handler
+app.use((err, req, res, next) => {
+    console.error('Unhandled error:', err);
+    res.status(500).json({
+        error: process.env.NODE_ENV === 'production' ? 'Internal server error' : err.message
+    });
+});
 // Start server
 app.listen(PORT, () => {
     console.log(`Backend running on port ${PORT}`);
