@@ -1,5 +1,6 @@
 import { Router, Response, Request } from "express";
 import { prisma } from "../lib/prisma";
+import { getCarImageUrl } from "../config/carImages";
 
 const router = Router();
 
@@ -40,8 +41,8 @@ router.get("/metadata/cars/:tokenId", async (req: Request, res: Response) => {
     const metadata = {
       name: car.modelName || `Car #${tokenId}`,
       description: `${car.series || "Mystery"} series car from BaseWheels collection`,
-      image: `https://your-cdn.com/cars/${tokenId}.png`, // TODO: Replace with actual image URL
-      external_url: `https://your-website.com/cars/${tokenId}`,
+      image: getCarImageUrl(car.modelName!) || `https://via.placeholder.com/400x300?text=${encodeURIComponent(car.modelName || "Car")}`,
+      external_url: `https://minigarage.vercel.app/cars/${tokenId}`,
       attributes: [
         {
           trait_type: "Series",
