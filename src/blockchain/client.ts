@@ -48,20 +48,51 @@ export async function mintFragment(
   fragmentType: number,
   amount: number = 1
 ): Promise<string> {
-  try {
-    const nonce = await wallet.getNonce("pending");
+  const MAX_RETRIES = 3;
+  let lastError: Error | null = null;
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const tx = await (fragmentContract as any).mintFragment(toAddress, fragmentType, amount, {
-      nonce,
-    });
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      console.log(`[mintFragment] Attempt ${attempt}/${MAX_RETRIES} for type ${fragmentType}`);
 
-    const receipt = await tx.wait();
-    return receipt.hash;
-  } catch (error) {
-    console.error("Mint fragment error:", error);
-    throw new Error("Failed to mint fragment on-chain");
+      if (!wallet.provider) {
+        throw new Error("Wallet provider not initialized");
+      }
+      const nonce = await wallet.provider.getTransactionCount(wallet.address, "pending");
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const tx = await (fragmentContract as any).mintFragment(toAddress, fragmentType, amount, {
+        nonce,
+      });
+
+      const receipt = await tx.wait();
+      console.log(`[mintFragment] Success! TX: ${receipt.hash}`);
+      return receipt.hash;
+    } catch (error) {
+      lastError = error as Error;
+      console.error(`[mintFragment] Attempt ${attempt} failed:`, error);
+
+      const isNonceError =
+        error instanceof Error &&
+        (error.message.includes("nonce") ||
+          error.message.includes("NONCE_EXPIRED") ||
+          error.message.includes("replacement"));
+
+      if (isNonceError && attempt < MAX_RETRIES) {
+        console.log(`[mintFragment] Retrying due to nonce error...`);
+        await new Promise((resolve) => setTimeout(resolve, attempt * 1000));
+        continue;
+      }
+
+      if (attempt === MAX_RETRIES) {
+        break;
+      }
+    }
   }
+
+  throw new Error(
+    `Failed to mint fragment after ${MAX_RETRIES} attempts: ${lastError?.message || "Unknown error"}`
+  );
 }
 
 /**
@@ -71,37 +102,67 @@ export async function mintFragment(
  * @note Contract auto-generates tokenId. ModelName/series stored off-chain in backend DB.
  */
 export async function mintCar(toAddress: string): Promise<{ tokenId: number; txHash: string }> {
-  try {
-    const nonce = await wallet.getNonce("pending");
+  const MAX_RETRIES = 3;
+  let lastError: Error | null = null;
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const tx = await (carContract as any).mintCar(toAddress, { nonce });
-    const receipt = await tx.wait();
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      console.log(`[mintCar] Attempt ${attempt}/${MAX_RETRIES} for ${toAddress}`);
 
-    const iface = carContract.interface;
-    let tokenId = 0;
+      if (!wallet.provider) {
+        throw new Error("Wallet provider not initialized");
+      }
+      const nonce = await wallet.provider.getTransactionCount(wallet.address, "pending");
 
-    for (const log of receipt.logs) {
-      try {
-        const parsed = iface.parseLog({ topics: log.topics as string[], data: log.data });
-        if (parsed && parsed.name === "CarMinted") {
-          tokenId = Number(parsed.args[1]); // Second arg is tokenId
-          break;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const tx = await (carContract as any).mintCar(toAddress, { nonce });
+      const receipt = await tx.wait();
+
+      const iface = carContract.interface;
+      let tokenId = 0;
+
+      for (const log of receipt.logs) {
+        try {
+          const parsed = iface.parseLog({ topics: log.topics as string[], data: log.data });
+          if (parsed && parsed.name === "CarMinted") {
+            tokenId = Number(parsed.args[1]);
+            break;
+          }
+        } catch {
+          continue;
         }
-      } catch {
-        // Skip logs that don't match
+      }
+
+      console.log(`[mintCar] Success! TokenId: ${tokenId}, TX: ${receipt.hash}`);
+      return {
+        tokenId,
+        txHash: receipt.hash,
+      };
+    } catch (error) {
+      lastError = error as Error;
+      console.error(`[mintCar] Attempt ${attempt} failed:`, error);
+
+      const isNonceError =
+        error instanceof Error &&
+        (error.message.includes("nonce") ||
+          error.message.includes("NONCE_EXPIRED") ||
+          error.message.includes("replacement"));
+
+      if (isNonceError && attempt < MAX_RETRIES) {
+        console.log(`[mintCar] Retrying due to nonce error...`);
+        await new Promise((resolve) => setTimeout(resolve, attempt * 1000));
         continue;
       }
-    }
 
-    return {
-      tokenId,
-      txHash: receipt.hash,
-    };
-  } catch (error) {
-    console.error("Mint car error:", error);
-    throw new Error("Failed to mint car NFT on-chain");
+      if (attempt === MAX_RETRIES) {
+        break;
+      }
+    }
   }
+
+  throw new Error(
+    `Failed to mint car after ${MAX_RETRIES} attempts: ${lastError?.message || "Unknown error"}`
+  );
 }
 
 /**
@@ -126,18 +187,53 @@ export async function checkAllParts(userAddress: string): Promise<boolean> {
  * @returns Transaction hash
  */
 export async function burnForAssembly(fromAddress: string): Promise<string> {
-  try {
-    const fragmentIds = [0, 1, 2, 3, 4];
-    const amounts = [1, 1, 1, 1, 1];
+  const MAX_RETRIES = 3;
+  let lastError: Error | null = null;
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const tx = await (fragmentContract as any).burnForAssembly(fromAddress, fragmentIds, amounts);
-    const receipt = await tx.wait();
-    return receipt.hash;
-  } catch (error) {
-    console.error("Burn for assembly error:", error);
-    throw new Error("Failed to burn fragments on-chain");
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      console.log(`[burnForAssembly] Attempt ${attempt}/${MAX_RETRIES}`);
+
+      const fragmentIds = [0, 1, 2, 3, 4];
+      const amounts = [1, 1, 1, 1, 1];
+
+      if (!wallet.provider) {
+        throw new Error("Wallet provider not initialized");
+      }
+      const nonce = await wallet.provider.getTransactionCount(wallet.address, "pending");
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const tx = await (fragmentContract as any).burnForAssembly(fromAddress, fragmentIds, amounts, {
+        nonce,
+      });
+      const receipt = await tx.wait();
+      console.log(`[burnForAssembly] Success! TX: ${receipt.hash}`);
+      return receipt.hash;
+    } catch (error) {
+      lastError = error as Error;
+      console.error(`[burnForAssembly] Attempt ${attempt} failed:`, error);
+
+      const isNonceError =
+        error instanceof Error &&
+        (error.message.includes("nonce") ||
+          error.message.includes("NONCE_EXPIRED") ||
+          error.message.includes("replacement"));
+
+      if (isNonceError && attempt < MAX_RETRIES) {
+        console.log(`[burnForAssembly] Retrying due to nonce error...`);
+        await new Promise((resolve) => setTimeout(resolve, attempt * 1000));
+        continue;
+      }
+
+      if (attempt === MAX_RETRIES) {
+        break;
+      }
+    }
   }
+
+  throw new Error(
+    `Failed to burn fragments after ${MAX_RETRIES} attempts: ${lastError?.message || "Unknown error"}`
+  );
 }
 
 /**
