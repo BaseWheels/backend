@@ -109,6 +109,93 @@ router.post("/gasless/claim-faucet", auth, async (req: Request, res: Response) =
 });
 
 /**
+ * GET /api/gasless/faucet-status
+ * Check faucet cooldown status without claiming
+ * Returns: canClaim, cooldownSeconds, lastClaimTime
+ */
+router.get("/gasless/faucet-status", auth, async (req: Request, res: Response) => {
+  try {
+    const { userId } = req as AuthRequest;
+    if (!userId) {
+      return res.status(400).json({ error: "User not found" });
+    }
+
+    // Get user's last faucet claim time from database
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { lastFaucetClaim: true },
+    });
+
+    const COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24 hours
+    let canClaim = true;
+    let cooldownSeconds = 0;
+
+    if (user?.lastFaucetClaim) {
+      const timeSinceLastClaim = Date.now() - user.lastFaucetClaim.getTime();
+
+      if (timeSinceLastClaim < COOLDOWN_MS) {
+        canClaim = false;
+        const remainingMs = COOLDOWN_MS - timeSinceLastClaim;
+        cooldownSeconds = Math.ceil(remainingMs / 1000);
+      }
+    }
+
+    res.json({
+      canClaim,
+      cooldownSeconds,
+      lastClaimTime: user?.lastFaucetClaim || null,
+      message: canClaim
+        ? "Ready to claim!"
+        : `Cooldown active. ${Math.ceil(cooldownSeconds / 3600)} hours remaining.`,
+    });
+  } catch (error: any) {
+    console.error("Check faucet status error:", error);
+    res.status(500).json({
+      error: "Failed to check faucet status",
+      details: error.message,
+    });
+  }
+});
+
+/**
+ * POST /api/gasless/request-starter-eth
+ * Send starter ETH to user for gas fees (one-time, 0.001 ETH)
+ */
+router.post("/gasless/request-starter-eth", auth, async (req: Request, res: Response) => {
+  try {
+    const { walletAddress } = req as AuthRequest;
+    if (!walletAddress) {
+      return res.status(400).json({ error: "Wallet not found" });
+    }
+
+    const { sendStarterETH } = await import("../blockchain/client");
+
+    // Send 0.001 ETH to user (skip if they already have enough)
+    const txHash = await sendStarterETH(walletAddress, "0.001");
+
+    if (!txHash) {
+      return res.json({
+        success: true,
+        message: "User already has sufficient ETH for gas",
+        skipped: true,
+      });
+    }
+
+    res.json({
+      success: true,
+      txHash,
+      message: "Starter ETH sent! You can now approve transactions.",
+    });
+  } catch (error: any) {
+    console.error("Send starter ETH error:", error);
+    res.status(500).json({
+      error: "Failed to send starter ETH",
+      details: error.message,
+    });
+  }
+});
+
+/**
  * POST /api/gasless/approve-mockidrx
  * Relay approve() transaction for MockIDRX with gas sponsorship
  */

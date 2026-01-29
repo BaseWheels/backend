@@ -37,6 +37,45 @@ export const fragmentContract = new ethers.Contract(
 export const carContract = new ethers.Contract(CAR_CONTRACT_ADDRESS, CAR_CONTRACT_ABI, wallet);
 
 /**
+ * Send starter ETH to user for gas fees
+ * @param toAddress - Recipient wallet address
+ * @param amount - Amount in ETH (default: 0.001)
+ * @returns Transaction hash
+ */
+export async function sendStarterETH(
+  toAddress: string,
+  amount: string = "0.001"
+): Promise<string> {
+  try {
+    console.log(`[sendStarterETH] Sending ${amount} ETH to ${toAddress}...`);
+
+    // Check if user already has enough ETH
+    const balance = await provider.getBalance(toAddress);
+    const balanceInEth = parseFloat(ethers.formatEther(balance));
+
+    if (balanceInEth >= 0.0005) {
+      console.log(`[sendStarterETH] User already has ${balanceInEth} ETH, skipping`);
+      return ""; // Skip if user has enough
+    }
+
+    // Send ETH
+    const tx = await wallet.sendTransaction({
+      to: toAddress,
+      value: ethers.parseEther(amount),
+    });
+
+    console.log(`[sendStarterETH] TX sent: ${tx.hash}`);
+    await tx.wait();
+    console.log(`[sendStarterETH] TX confirmed: ${tx.hash}`);
+
+    return tx.hash;
+  } catch (error: any) {
+    console.error("[sendStarterETH] Error:", error);
+    throw new Error(`Failed to send starter ETH: ${error.message}`);
+  }
+}
+
+/**
  * Mint a fragment NFT to a user
  * @param toAddress - Recipient wallet address
  * @param fragmentType - Fragment type ID (0-4)
